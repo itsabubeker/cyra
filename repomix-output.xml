@@ -1,0 +1,1027 @@
+This file is a merged representation of the entire codebase, combined into a single document by Repomix.
+
+<file_summary>
+This section contains a summary of this file.
+
+<purpose>
+This file contains a packed representation of the entire repository's contents.
+It is designed to be easily consumable by AI systems for analysis, code review,
+or other automated processes.
+</purpose>
+
+<file_format>
+The content is organized as follows:
+1. This summary section
+2. Repository information
+3. Directory structure
+4. Repository files (if enabled)
+5. Multiple file entries, each consisting of:
+  - File path as an attribute
+  - Full contents of the file
+</file_format>
+
+<usage_guidelines>
+- This file should be treated as read-only. Any changes should be made to the
+  original repository files, not this packed version.
+- When processing this file, use the file path to distinguish
+  between different files in the repository.
+- Be aware that this file may contain sensitive information. Handle it with
+  the same level of security as you would the original repository.
+</usage_guidelines>
+
+<notes>
+- Some files may have been excluded based on .gitignore rules and Repomix's configuration
+- Binary files are not included in this packed representation. Please refer to the Repository Structure section for a complete list of file paths, including binary files
+- Files matching patterns in .gitignore are excluded
+- Files matching default ignore patterns are excluded
+- Files are sorted by Git change count (files with more changes are at the bottom)
+</notes>
+
+</file_summary>
+
+<directory_structure>
+src/
+  movies/
+    dto/
+      create-movie.dto.ts
+      update-movie.dto.ts
+    entities/
+      media-file.entity.ts
+      movie.entity.ts
+    movies.controller.ts
+    movies.module.ts
+    movies.service.ts
+  scanner/
+    filenameParser.spec.ts
+    filenameParser.ts
+    scanner.controller.spec.ts
+    scanner.controller.ts
+    scanner.module.ts
+    scanner.service.spec.ts
+    scanner.service.ts
+  app.controller.spec.ts
+  app.controller.ts
+  app.module.ts
+  app.service.ts
+  main.ts
+test/
+  app.e2e-spec.ts
+.gitattributes
+.gitignore
+.oxlintrc.json
+.prettierrc
+AGENTS.md
+nest-cli.json
+package.json
+README.md
+tsconfig.build.json
+tsconfig.json
+vitest.config.e2e.ts
+vitest.config.ts
+</directory_structure>
+
+<files>
+This section contains the contents of the repository's files.
+
+<file path="src/movies/dto/create-movie.dto.ts">
+export class CreateMovieDto {}
+</file>
+
+<file path="src/movies/dto/update-movie.dto.ts">
+import { PartialType } from '@nestjs/mapped-types';
+import { CreateMovieDto } from './create-movie.dto.js';
+
+export class UpdateMovieDto extends PartialType(CreateMovieDto) {}
+</file>
+
+<file path="src/movies/entities/media-file.entity.ts">
+// library/entities/media-file.entity.ts
+import {
+  Column,
+  Entity,
+  ManyToOne,
+  PrimaryGeneratedColumn,
+  type Relation,
+} from 'typeorm';
+import { Movie } from './movie.entity.js';
+
+export enum MatchStatus {
+  Unmatched = 'unmatched',
+  Matched = 'matched',
+  Manual = 'manual',
+}
+
+@Entity()
+export class MediaFile {
+  @PrimaryGeneratedColumn()
+  id!: number;
+
+  // relative to MEDIA_DIR, so it survives the Docker mount change
+  @Column({ unique: true })
+  relativePath!: string;
+
+  @Column()
+  parsedTitle!: string;
+
+  @Column({ type: 'integer', nullable: true })
+  parsedYear!: number | null;
+
+  @Column({ type: 'integer' })
+  sizeBytes!: number;
+
+  @Column({
+    type: 'simple-enum',
+    enum: MatchStatus,
+    default: MatchStatus.Unmatched,
+  })
+  matchStatus!: MatchStatus;
+
+  @Column({ type: 'real', nullable: true })
+  matchScore!: number | null;
+
+  @ManyToOne(() => Movie, (movie) => movie.files, {
+    nullable: true,
+    onDelete: 'SET NULL',
+  })
+  movie!: Relation<Movie> | null;
+}
+</file>
+
+<file path="src/movies/entities/movie.entity.ts">
+import {
+  Column,
+  Entity,
+  OneToMany,
+  PrimaryGeneratedColumn,
+  type Relation,
+} from 'typeorm';
+import { MediaFile } from './media-file.entity.js';
+
+@Entity()
+export class Movie {
+  @PrimaryGeneratedColumn()
+  id!: number;
+
+  @Column({ unique: true })
+  tmdbId!: number;
+
+  @Column()
+  title!: string;
+
+  @Column({ type: 'integer', nullable: true })
+  year!: number | null;
+
+  @Column({ type: 'varchar', nullable: true })
+  posterPath!: string | null;
+
+  @OneToMany(() => MediaFile, (file) => file.movie)
+  files!: Relation<MediaFile[]>;
+}
+</file>
+
+<file path="src/movies/movies.controller.ts">
+import { Controller, Get, Param } from '@nestjs/common';
+import { MoviesService } from './movies.service.js';
+
+@Controller('movies')
+export class MoviesController {
+  constructor(private readonly moviesService: MoviesService) {}
+
+  @Get()
+  findAll() {
+    return this.moviesService.findAll();
+  }
+
+  @Get(':id')
+  findOne(@Param('id') id: string) {
+    return this.moviesService.findOne(+id);
+  }
+}
+</file>
+
+<file path="src/movies/movies.module.ts">
+import { Module } from '@nestjs/common';
+import { MoviesService } from './movies.service.js';
+import { MoviesController } from './movies.controller.js';
+import { TypeOrmModule } from '@nestjs/typeorm';
+import { Movie } from './entities/movie.entity.js';
+import { MediaFile } from './entities/media-file.entity.js';
+
+@Module({
+  imports: [TypeOrmModule.forFeature([Movie, MediaFile])],
+  controllers: [MoviesController],
+  providers: [MoviesService],
+  exports: [TypeOrmModule],
+})
+export class MoviesModule {}
+</file>
+
+<file path="src/movies/movies.service.ts">
+import { Injectable } from '@nestjs/common';
+import { CreateMovieDto } from './dto/create-movie.dto.js';
+
+@Injectable()
+export class MoviesService {
+  create(createMovieDto: CreateMovieDto) {
+    return 'This action adds a new movie';
+  }
+
+  findAll() {
+    return `This action returns all movies`;
+  }
+
+  findOne(id: number) {
+    return `This action returns a #${id} movie`;
+  }
+}
+</file>
+
+<file path="src/scanner/filenameParser.spec.ts">
+import { parseFilename } from './filenameParser.js';
+
+describe('parseFilename', () => {
+  it.each([
+    // [input, expected title, expected year]
+    ['The.Matrix.1999.1080p.BluRay.x264.mkv', 'The Matrix', 1999],
+    ['Matrix (1999).mp4', 'Matrix', 1999],
+    ['[YTS] Inception_2010_720p.mp4', 'Inception', 2010],
+    [
+      'Spider-Man.No.Way.Home.2021.2160p.WEB-DL.mkv',
+      'Spider-Man No Way Home',
+      2021,
+    ],
+    ['Heat - 1995.mkv', 'Heat', 1995],
+
+    // year is part of the title
+    ['2001.A.Space.Odyssey.1968.mkv', '2001 A Space Odyssey', 1968],
+    ['Blade Runner 2049 (2017).mkv', 'Blade Runner 2049', 2017],
+    ['Blade.Runner.2049.1080p.BluRay.mkv', 'Blade Runner 2049', null],
+    ['Wonder Woman 1984 2020 1080p.mkv', 'Wonder Woman 1984', 2020],
+    ['1917.2019.720p.mkv', '1917', 2019],
+    ['1917.mkv', '1917', null],
+
+    // no year at all
+    ['Some Movie.mkv', 'Some Movie', null],
+    ['Some.Movie.1080p.BluRay.mkv', 'Some Movie', null],
+
+    ['Gladiator.EXTENDED.2000.1080.BrRip.264.YIFY.mp4', 'Gladiator', 2000],
+    [
+      'Donnie.Darko.DIRECTORS.CUT.2001.1080p.BrRip.x264.YIFY.mp4',
+      'Donnie Darko',
+      2001,
+    ],
+    ['Gladiator - Extended (2000).mkv', 'Gladiator', 2000],
+    // regression guard: "uncut" must NOT be stripped
+    ['Uncut.Gems.2019.1080p.BluRay.x264.mp4', 'Uncut Gems', 2019],
+  ])('%s -> %s (%s)', (input, title, year) => {
+    expect(parseFilename(input)).toEqual({ title, year });
+  });
+});
+</file>
+
+<file path="src/scanner/filenameParser.ts">
+export interface ParsedFilename {
+  title: string;
+  year: number | null;
+}
+
+const VIDEO_EXTENSION = /\.(mkv|mp4|avi|mov|wmv|m4v|webm|ts)$/i;
+
+const EDITION_SUFFIX =
+  /(\s+(extended|unrated|director'?s? cut|remastered|theatrical|special edition))+$/i;
+
+// Quality / source / codec tags. Used to cut the title when there's no year.
+const JUNK =
+  /\b(2160p|1080p|720p|480p|4k|uhd|bluray|blu-ray|bdrip|brrip|webrip|web-dl|webdl|hdtv|dvdrip|hdrip|remux|x264|x265|h264|h265|hevc|aac|ac3|dts|extended|unrated|remastered|proper|repack)\b/i;
+
+const FIRST_FILM_YEAR = 1888;
+// Rejects "Blade Runner 2049" style titles: 2049 is not a plausible release year.
+const MAX_YEAR = new Date().getFullYear() + 1;
+
+function findYear(name: string): { year: number; index: number } | null {
+  let found: { year: number; index: number } | null = null;
+
+  for (const match of name.matchAll(/(?<!\d)(?:19|20)\d{2}(?!\d)/g)) {
+    const year = Number(match[0]);
+    const index = match.index ?? 0;
+
+    if (year < FIRST_FILM_YEAR || year > MAX_YEAR) continue;
+    // A number at the very start is part of the title ("1917", "2001 A Space Odyssey").
+    if (index === 0) continue;
+
+    // Keep the LAST valid year: "Wonder Woman 1984 2020" -> 2020.
+    found = { year, index };
+  }
+
+  return found;
+}
+
+export function parseFilename(filename: string): ParsedFilename {
+  let name = filename
+    .replace(VIDEO_EXTENSION, '')
+    .replace(/^\[[^\]]*\]\s*/, '') // leading release group: "[YTS] Movie..."
+    .replace(/[._]+/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+
+  const found = findYear(name);
+
+  let titlePart: string;
+  if (found) {
+    titlePart = name.slice(0, found.index);
+  } else {
+    const junkIndex = name.search(JUNK);
+    titlePart = junkIndex > 0 ? name.slice(0, junkIndex) : name;
+  }
+
+  const title = titlePart
+    .replace(/[[\]()]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .replace(EDITION_SUFFIX, '')
+    .replace(/[\s\-–]+$/, '')
+    .trim();
+
+  return { title, year: found?.year ?? null };
+}
+</file>
+
+<file path="src/scanner/scanner.controller.spec.ts">
+import { Test, TestingModule } from '@nestjs/testing';
+import { ScannerController } from './scanner.controller.js';
+
+describe('ScannerController', () => {
+  let controller: ScannerController;
+
+  beforeEach(async () => {
+    const module: TestingModule = await Test.createTestingModule({
+      controllers: [ScannerController],
+    }).compile();
+
+    controller = module.get<ScannerController>(ScannerController);
+  });
+
+  it('should be defined', () => {
+    expect(controller).toBeDefined();
+  });
+});
+</file>
+
+<file path="src/scanner/scanner.controller.ts">
+import { Controller, Get, HttpCode, Post } from '@nestjs/common';
+import { ScannerService } from './scanner.service.js';
+
+@Controller('scanner')
+export class ScannerController {
+  constructor(private readonly scannerService: ScannerService) {}
+
+  @Post()
+  @HttpCode(200)
+  async scan() {
+    const items = await this.scannerService.scan();
+    return { count: items.length, items };
+  }
+}
+</file>
+
+<file path="src/scanner/scanner.module.ts">
+import { Module } from '@nestjs/common';
+import { ScannerService } from './scanner.service.js';
+import { ScannerController } from './scanner.controller.js';
+import { MoviesModule } from '../movies/movies.module.js';
+
+@Module({
+  imports: [MoviesModule],
+  providers: [ScannerService],
+  controllers: [ScannerController],
+})
+export class ScannerModule {}
+</file>
+
+<file path="src/scanner/scanner.service.spec.ts">
+import { Test, TestingModule } from '@nestjs/testing';
+import { ScannerService } from './scanner.service.js';
+
+describe('ScannerService', () => {
+  let service: ScannerService;
+
+  beforeEach(async () => {
+    const module: TestingModule = await Test.createTestingModule({
+      providers: [ScannerService],
+    }).compile();
+
+    service = module.get<ScannerService>(ScannerService);
+  });
+
+  it('should be defined', () => {
+    expect(service).toBeDefined();
+  });
+});
+</file>
+
+<file path="src/scanner/scanner.service.ts">
+import { Injectable, Logger } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
+import { readdir, stat } from 'node:fs/promises';
+import path from 'node:path';
+import { parseFilename } from './filenameParser.js';
+import { InjectRepository } from '@nestjs/typeorm';
+import { MediaFile } from '../movies/entities/media-file.entity.js';
+import { Repository } from 'typeorm';
+
+const VIDEO_EXTS = new Set([
+  '.mp4',
+  '.mkv',
+  '.mov',
+  '.avi',
+  '.webm',
+  '.flv',
+  '.wmv',
+  '.m4v',
+  '.mpg',
+  '.mpeg',
+]);
+
+const EXTRAS_DIRS = new Set([
+  'featurettes',
+  'extras',
+  'samples',
+  'sample',
+  'trailers',
+  'behind the scenes',
+  'deleted scenes',
+  'interviews',
+  'bonus',
+]);
+
+export interface VideoFile {
+  name: string;
+  path: string;
+  size: number;
+}
+
+const scanDir = async (dir: string): Promise<VideoFile[]> => {
+  const entries = await readdir(dir, { withFileTypes: true, recursive: true });
+
+  const isVideo = (name: string) =>
+    VIDEO_EXTS.has(path.extname(name).toLowerCase());
+
+  const videos = entries.filter((e) => {
+    const inExtras = path
+      .relative(dir, e.parentPath)
+      .toLowerCase()
+      .split(path.sep)
+      .some((segment) => EXTRAS_DIRS.has(segment));
+
+    return e.isFile() && isVideo(e.name) && !inExtras;
+  });
+
+  return Promise.all(
+    videos.map(async (e) => {
+      const fullPath = path.join(e.parentPath, e.name);
+      const { size } = await stat(fullPath);
+      return { name: e.name, path: fullPath, size };
+    }),
+  );
+};
+
+@Injectable()
+export class ScannerService {
+  private readonly logger = new Logger(ScannerService.name);
+
+  constructor(
+    private readonly configService: ConfigService,
+    @InjectRepository(MediaFile)
+    private readonly files: Repository<MediaFile>,
+  ) {}
+
+  async scan() {
+    const mediaDir = this.configService.getOrThrow<string>('MEDIA_DIR');
+
+    const videos = await scanDir(mediaDir);
+
+    const items = videos.map((video) => {
+      const fromFile = parseFilename(video.name);
+      const fromFolder = parseFilename(path.basename(path.dirname(video.path)));
+
+      const parsed =
+        fromFile.year === null && fromFolder.year !== null
+          ? fromFolder
+          : fromFile;
+
+      return {
+        relativePath: path.relative(mediaDir, video.path),
+        parsedTitle: parsed.title,
+        parsedYear: parsed.year,
+        sizeBytes: video.size,
+      };
+    });
+
+    for (let i = 0; i < items.length; i += 200) {
+      await this.files.upsert(items.slice(i, i + 200), ['relativePath']);
+    }
+
+    this.logger.log(`Scanned ${items.length} video files in ${mediaDir}`);
+
+    return items;
+  }
+}
+</file>
+
+<file path="src/app.controller.spec.ts">
+import { Test, TestingModule } from '@nestjs/testing';
+import { AppController } from './app.controller.js';
+import { AppService } from './app.service.js';
+
+describe('AppController', () => {
+  let appController: AppController;
+
+  beforeEach(async () => {
+    const app: TestingModule = await Test.createTestingModule({
+      controllers: [AppController],
+      providers: [AppService],
+    }).compile();
+
+    appController = app.get<AppController>(AppController);
+  });
+
+  describe('root', () => {
+    it('should return "Hello World!"', () => {
+      expect(appController.getHello()).toBe('Hello World!');
+    });
+  });
+});
+</file>
+
+<file path="src/app.controller.ts">
+import { Controller, Get } from '@nestjs/common';
+import { AppService } from './app.service.js';
+
+@Controller()
+export class AppController {
+  constructor(private readonly appService: AppService) {}
+
+  @Get()
+  getHello(): string {
+    return this.appService.getHello();
+  }
+}
+</file>
+
+<file path="src/app.module.ts">
+import { Module } from '@nestjs/common';
+import { AppController } from './app.controller.js';
+import { AppService } from './app.service.js';
+import { ScannerModule } from './scanner/scanner.module.js';
+import { ConfigModule, ConfigService } from '@nestjs/config';
+import { TypeOrmModule } from '@nestjs/typeorm';
+import { MoviesModule } from './movies/movies.module.js';
+
+@Module({
+  imports: [
+    ScannerModule,
+    ConfigModule.forRoot({ isGlobal: true }),
+    TypeOrmModule.forRootAsync({
+      inject: [ConfigService],
+      useFactory: (config: ConfigService) => ({
+        type: 'better-sqlite3',
+        database: config.get<string>('DB_PATH', 'data/media.db'),
+        autoLoadEntities: true,
+        synchronize: true, // dev only, see note below
+      }),
+    }),
+    MoviesModule,
+  ],
+  controllers: [AppController],
+  providers: [AppService],
+})
+export class AppModule {}
+</file>
+
+<file path="src/app.service.ts">
+import { Injectable } from '@nestjs/common';
+
+@Injectable()
+export class AppService {
+  getHello(): string {
+    return 'Hello World!';
+  }
+}
+</file>
+
+<file path="src/main.ts">
+import { NestFactory } from '@nestjs/core';
+import { AppModule } from './app.module.js';
+
+async function bootstrap() {
+  const app = await NestFactory.create(AppModule);
+  await app.listen(process.env.PORT ?? 3000);
+}
+await bootstrap();
+</file>
+
+<file path="test/app.e2e-spec.ts">
+import { Test, TestingModule } from '@nestjs/testing';
+import { INestApplication } from '@nestjs/common';
+import request from 'supertest';
+import { App } from 'supertest/types.js';
+import { AppModule } from './../src/app.module.js';
+
+describe('AppController (e2e)', () => {
+  let app: INestApplication<App>;
+
+  beforeEach(async () => {
+    const moduleFixture: TestingModule = await Test.createTestingModule({
+      imports: [AppModule],
+    }).compile();
+
+    app = moduleFixture.createNestApplication();
+    await app.init();
+  });
+
+  it('/ (GET)', () => {
+    return request(app.getHttpServer())
+      .get('/')
+      .expect(200)
+      .expect('Hello World!');
+  });
+
+  afterEach(async () => {
+    await app.close();
+  });
+});
+</file>
+
+<file path=".gitattributes">
+* text=auto eol=lf
+</file>
+
+<file path=".gitignore">
+# compiled output
+/dist
+/node_modules
+/build
+
+# TypeScript build cache
+*.tsbuildinfo
+
+# Logs
+logs
+*.log
+npm-debug.log*
+pnpm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+lerna-debug.log*
+
+# OS
+.DS_Store
+
+# Tests
+/coverage
+/.nyc_output
+
+
+#sqlitedb
+data/
+
+# IDEs and editors
+/.idea
+.project
+.classpath
+.c9/
+*.launch
+.settings/
+*.sublime-workspace
+
+# IDE - VSCode
+.vscode/*
+!.vscode/settings.json
+!.vscode/tasks.json
+!.vscode/launch.json
+!.vscode/extensions.json
+
+# dotenv environment variable files
+.env
+.env.development.local
+.env.test.local
+.env.production.local
+.env.local
+
+# temp directory
+.temp
+.tmp
+
+# Runtime data
+pids
+*.pid
+*.seed
+*.pid.lock
+
+# Diagnostic reports (https://nodejs.org/api/report.html)
+report.[0-9]*.[0-9]*.[0-9]*.[0-9]*.json
+</file>
+
+<file path=".oxlintrc.json">
+{
+  "$schema": "./node_modules/oxlint/configuration_schema.json",
+  "rules": {
+    "typescript/no-explicit-any": "off",
+    "typescript/no-floating-promises": "error"
+  },
+  "env": {
+    "node": true
+  }
+}
+</file>
+
+<file path=".prettierrc">
+{
+  "singleQuote": true,
+  "trailingComma": "all"
+}
+</file>
+
+<file path="AGENTS.md">
+# AGENTS.md
+
+## Production data: NestJS Observe
+
+This app's production telemetry - traces, errors, logs and metrics - goes to [NestJS Observe](https://observe.nestjs.com). Until `ObserveModule` is registered in `src/app.module.ts`, nothing is sent: `npx @nestjs/observe link` sets it up in one step - it installs `@nestjs/observe`, wires it into the app, and writes the key pair (`OBSERVE_APP_KEY`, `OBSERVE_APP_SECRET`) to `.env`.
+
+When a task depends on how the app behaves in production - an error users hit, a slow endpoint, a failing job, whether a release made things worse - work from that data, not from the code alone:
+
+- The Observe MCP server answers those questions directly: errors with their traces and logs, slow operations, jobs, and what a release changed (`find_regressions`, `diff_release`). It is included on the Pro plan and above. In Claude Code: `claude mcp add observe --transport http https://observe-api.nestjs.com/mcp`, and the client opens a browser to approve. Other clients: https://www.observe.nestjs.com/documentation/mcp
+- Without it, the user can open the request or error in the Observe dashboard and click **Copy agent prompt**, which hands over that page's trace, stack and logs as text.
+</file>
+
+<file path="nest-cli.json">
+{
+  "$schema": "https://json.schemastore.org/nest-cli",
+  "collection": "@nestjs/schematics",
+  "sourceRoot": "src",
+  "compilerOptions": {
+    "deleteOutDir": true
+  }
+}
+</file>
+
+<file path="package.json">
+{
+  "name": "media-server",
+  "version": "0.0.1",
+  "description": "",
+  "author": "",
+  "private": true,
+  "license": "UNLICENSED",
+  "type": "module",
+  "scripts": {
+    "build": "nest build",
+    "deploy": "nest deploy",
+    "format": "prettier --write \"src/**/*.ts\" \"test/**/*.ts\"",
+    "start": "nest start",
+    "start:dev": "nest start --watch",
+    "start:debug": "nest start --debug --watch",
+    "start:prod": "node dist/main",
+    "lint": "oxlint --type-aware src/ test/",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:cov": "vitest run --coverage",
+    "test:debug": "vitest --inspect-brk --no-file-parallelism",
+    "test:e2e": "vitest run --config ./vitest.config.e2e.ts"
+  },
+  "dependencies": {
+    "@nestjs/common": "^12.0.1",
+    "@nestjs/config": "^12.0.1",
+    "@nestjs/core": "^12.0.1",
+    "@nestjs/mapped-types": "*",
+    "@nestjs/platform-express": "^12.0.1",
+    "@nestjs/typeorm": "^12.0.2",
+    "better-sqlite3": "^12.11.1",
+    "reflect-metadata": "^0.2.2",
+    "rxjs": "^7.8.1",
+    "typeorm": "^1.1.2"
+  },
+  "devDependencies": {
+    "@nestjs/cli": "^12.0.0",
+    "@nestjs/mau": "^0.2.6",
+    "@nestjs/schematics": "^12.0.0",
+    "@nestjs/testing": "^12.0.1",
+    "@types/better-sqlite3": "^9.6.0",
+    "@types/express": "^5.0.0",
+    "@types/node": "^24.0.0",
+    "@types/supertest": "^7.0.0",
+    "@vitest/coverage-v8": "^4.1.2",
+    "oxlint": "^1.58.0",
+    "oxlint-tsgolint": "^7.0.2001",
+    "prettier": "^3.4.2",
+    "source-map-support": "^0.5.21",
+    "supertest": "^7.0.0",
+    "typescript": "^6.0.2",
+    "vite": "^8.0.0",
+    "vitest": "^4.1.2"
+  }
+}
+</file>
+
+<file path="README.md">
+<p align="center">
+  <a href="http://nestjs.com/" target="blank"><img src="https://nestjs.com/img/logo-small.svg" width="120" alt="Nest Logo" /></a>
+</p>
+
+[circleci-image]: https://img.shields.io/circleci/build/github/nestjs/nest/master?token=abc123def456
+[circleci-url]: https://circleci.com/gh/nestjs/nest
+
+  <p align="center">A progressive <a href="http://nodejs.org" target="_blank">Node.js</a> framework for building efficient and scalable server-side applications.</p>
+    <p align="center">
+<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/v/@nestjs/core.svg" alt="NPM Version" /></a>
+<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/l/@nestjs/core.svg" alt="Package License" /></a>
+<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/dm/@nestjs/common.svg" alt="NPM Downloads" /></a>
+<a href="https://circleci.com/gh/nestjs/nest" target="_blank"><img src="https://img.shields.io/circleci/build/github/nestjs/nest/master" alt="CircleCI" /></a>
+<a href="https://discord.gg/G7Qnnhy" target="_blank"><img src="https://img.shields.io/badge/discord-online-brightgreen.svg" alt="Discord"/></a>
+<a href="https://opencollective.com/nest#backer" target="_blank"><img src="https://opencollective.com/nest/backers/badge.svg" alt="Backers on Open Collective" /></a>
+<a href="https://opencollective.com/nest#sponsor" target="_blank"><img src="https://opencollective.com/nest/sponsors/badge.svg" alt="Sponsors on Open Collective" /></a>
+  <a href="https://paypal.me/kamilmysliwiec" target="_blank"><img src="https://img.shields.io/badge/Donate-PayPal-ff3f59.svg" alt="Donate us"/></a>
+    <a href="https://opencollective.com/nest#sponsor"  target="_blank"><img src="https://img.shields.io/badge/Support%20us-Open%20Collective-41B883.svg" alt="Support us"></a>
+  <a href="https://twitter.com/nestframework" target="_blank"><img src="https://img.shields.io/twitter/follow/nestframework.svg?style=social&label=Follow" alt="Follow us on Twitter"></a>
+</p>
+  <!--[![Backers on Open Collective](https://opencollective.com/nest/backers/badge.svg)](https://opencollective.com/nest#backer)
+  [![Sponsors on Open Collective](https://opencollective.com/nest/sponsors/badge.svg)](https://opencollective.com/nest#sponsor)-->
+
+## Description
+
+[Nest](https://github.com/nestjs/nest) framework TypeScript starter repository.
+
+## Project setup
+
+```bash
+$ npm install
+```
+
+## Compile and run the project
+
+```bash
+# development
+$ npm run start
+
+# watch mode
+$ npm run start:dev
+
+# production mode
+$ npm run start:prod
+```
+
+## Run tests
+
+```bash
+# unit tests
+$ npm run test
+
+# e2e tests
+$ npm run test:e2e
+
+# test coverage
+$ npm run test:cov
+```
+
+## Deployment
+
+When you're ready to deploy your NestJS application to production, there are some key steps you can take to ensure it runs as efficiently as possible. Check out the [deployment documentation](https://docs.nestjs.com/deployment) for more information.
+
+If you are looking for a cloud-based platform to deploy your NestJS application, check out [Mau](https://mau.nestjs.com), our official platform for deploying NestJS applications on AWS. Mau makes deployment straightforward and fast, requiring just a few simple steps:
+
+```bash
+$ npm install -g @nestjs/mau
+$ mau deploy
+```
+
+With Mau, you can deploy your application in just a few clicks, allowing you to focus on building features rather than managing infrastructure.
+
+## Observability
+
+In production applications, observability is essential for understanding how your system behaves, detecting issues early, and maintaining reliable performance.
+
+[NestJS Observe](https://observe.nestjs.com) automatically instruments your NestJS application, giving you deep visibility into your system with minimal setup:
+
+- **Distributed tracing:** Follow requests across services and understand how they flow through your system.
+- **Waterfall analysis:** Visualize request execution and identify slow operations, bottlenecks, and unexpected delays.
+- **Performance analysis:** Analyze application performance in real time and quickly pinpoint areas that need optimization.
+- **Metrics:** Track key application and infrastructure metrics to understand system health and performance trends.
+- **Logging:** Centralize and correlate logs with traces and other telemetry to make debugging easier.
+- **Error tracking:** Detect errors quickly and investigate their root causes with the surrounding context.
+- **SLA monitoring:** Track service-level objectives and identify when your application is approaching or exceeding defined thresholds.
+- **Alarms and alerts:** Set up alerts for critical errors, performance degradation, SLA violations, and other anomalies so your team can react quickly.
+
+To add it to this project, run this and approve the code it prints at [observe.nestjs.com/link](https://observe.nestjs.com/link) - signing up for free if you have no account:
+
+```bash
+$ npx @nestjs/observe link
+```
+
+It installs `@nestjs/observe`, wires it into `AppModule` and `main.ts`, and writes the app key and secret into `.env`, which every `nest start` script (`start`, `start:dev`, `start:debug`) then loads. In production, set `OBSERVE_APP_KEY` and `OBSERVE_APP_SECRET` in the environment instead.
+
+Or do it by hand:
+
+```bash
+$ npm install @nestjs/observe
+```
+
+Then follow the [setup guide](https://docs.nestjs.com/observability/sdk) - it takes a single import and an app key.
+
+The free plan needs no payment details and covers 300,000 events a month. You can also browse the [live demo](https://www.observe-demo.nestjs.com/dashboard) first - the whole dashboard over a busy service's data, with nothing to install.
+
+## Resources
+
+Check out a few resources that may come in handy when working with NestJS:
+
+- Visit the [NestJS Documentation](https://docs.nestjs.com) to learn more about the framework.
+- For questions and support, please visit our [Discord channel](https://discord.gg/G7Qnnhy).
+- To dive deeper and get more hands-on experience, check out our official video [courses](https://courses.nestjs.com/).
+- Deploy your application to AWS with the help of [NestJS Mau](https://mau.nestjs.com) in just a few clicks.
+- Auto-instrument your application with [NestJS Observe](https://observe.nestjs.com). Distributed tracing, metrics, and logging made easy. Error tracking and performance monitoring for your NestJS applications.
+- Visualize your application graph and interact with the NestJS application in real-time using [NestJS Devtools](https://devtools.nestjs.com).
+- Need help with your project (part-time to full-time)? Check out our official [enterprise support](https://enterprise.nestjs.com).
+- To stay in the loop and get updates, follow us on [X](https://x.com/nestframework) and [LinkedIn](https://linkedin.com/company/nestjs).
+- Looking for a job, or have a job to offer? Check out our official [Jobs board](https://jobs.nestjs.com).
+
+## Support
+
+Nest is an MIT-licensed open source project. It can grow thanks to the sponsors and support by the amazing backers. If you'd like to join them, please [read more here](https://docs.nestjs.com/support).
+
+## Stay in touch
+
+- Author - [Kamil Myśliwiec](https://twitter.com/kammysliwiec)
+- Website - [https://nestjs.com](https://nestjs.com/)
+- Twitter - [@nestframework](https://twitter.com/nestframework)
+
+## License
+
+Nest is [MIT licensed](https://github.com/nestjs/nest/blob/master/LICENSE).
+</file>
+
+<file path="tsconfig.build.json">
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "rootDir": "./src"
+  },
+  "include": ["src"],
+  "exclude": ["node_modules", "test", "dist", "**/*spec.ts"]
+}
+</file>
+
+<file path="tsconfig.json">
+{
+  "compilerOptions": {
+    "module": "nodenext",
+    "moduleResolution": "nodenext",
+    "resolvePackageJsonExports": true,
+    "esModuleInterop": true,
+    "isolatedModules": true,
+    "declaration": true,
+    "removeComments": true,
+    "emitDecoratorMetadata": true,
+    "experimentalDecorators": true,
+    "allowSyntheticDefaultImports": true,
+    "target": "ES2023",
+    "sourceMap": true,
+    "outDir": "./dist",
+    "rootDir": ".",
+    "incremental": true,
+    "skipLibCheck": true,
+    "strict": true,
+    "strictPropertyInitialization": false,
+    "types": ["vitest/globals", "node"]
+  }
+}
+</file>
+
+<file path="vitest.config.e2e.ts">
+import { defineConfig } from 'vitest/config';
+
+export default defineConfig({
+  resolve: { tsconfigPaths: true },
+  test: {
+    globals: true,
+    root: './',
+    include: ['**/*.e2e-spec.ts'],
+  },
+});
+</file>
+
+<file path="vitest.config.ts">
+import { defineConfig } from 'vitest/config';
+
+export default defineConfig({
+  // Resolves the path aliases declared in tsconfig.json, including the ones
+  // added by `nest g library`. Requires Vite 8, which ships this option.
+  resolve: { tsconfigPaths: true },
+  test: {
+    globals: true,
+    root: './',
+    include: ['**/*.spec.ts'],
+  },
+});
+</file>
+
+</files>
