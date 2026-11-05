@@ -5,6 +5,7 @@ import { ScannerModule } from './scanner/scanner.module.js';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { MoviesModule } from './movies/movies.module.js';
+import { MetaDataModule } from './metadata/metadata.module.js';
 
 @Module({
   imports: [
@@ -20,6 +21,7 @@ import { MoviesModule } from './movies/movies.module.js';
       }),
     }),
     MoviesModule,
+    MetaDataModule,
   ],
   controllers: [AppController],
   providers: [AppService],

@@ -1,7 +1,7 @@
 import { Module } from '@nestjs/common';
-import { ScannerService } from './scanner.service.js';
-import { ScannerController } from './scanner.controller.js';
 import { MoviesModule } from '../movies/movies.module.js';
+import { ScannerController } from './scanner.controller.js';
+import { ScannerService } from './scanner.service.js';
 
 @Module({
   imports: [MoviesModule],
