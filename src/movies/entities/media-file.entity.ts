@@ -1,4 +1,3 @@
-// library/entities/media-file.entity.ts
 import {
   Column,
   Entity,
