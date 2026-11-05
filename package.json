@@ -1,10 +1,18 @@
 {
-  "name": "media-server",
-  "version": "0.0.1",
-  "description": "",
-  "author": "",
+  "name": "cyra",
+  "version": "0.1.0",
+  "description": "Self-hosted movie library and streaming server built with NestJS.",
+  "keywords": [
+    "media-server",
+    "self-hosted",
+    "nestjs",
+    "tmdb",
+    "streaming",
+    "movies"
+  ],
+  "license": "MIT",
+  "author": "abubeker abduljelil",
   "private": true,
-  "license": "UNLICENSED",
   "type": "module",
   "scripts": {
     "build": "nest build",
