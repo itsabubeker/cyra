@@ -17,7 +17,7 @@ export class MoviesService {
     if (year) where.year = year;
 
     return this.movies.findAndCount({
-      order: { title: 'ASC' },
+      order: { title: 'ASC', id: 'ASC' },
       where,
       take: limit,
       skip: limit * (page - 1),
@@ -29,7 +29,7 @@ export class MoviesService {
       where: { id },
       relations: { files: true },
     });
-    if (!movie) throw new NotFoundException(`Movies with ID ${id} not found `);
+    if (!movie) throw new NotFoundException(`Movie with ID ${id} not found `);
     return movie;
   }
 }

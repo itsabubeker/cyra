@@ -1,7 +1,8 @@
 import { Type } from 'class-transformer';
-import { IsInt, IsOptional, IsString, Max, Min } from 'class-validator';
+import { IsInt, IsOptional, IsString } from 'class-validator';
+import { PaginationQueryDto } from '../../common/dto/pagination-query.dto.js';
 
-export class ListMoviesQueryDto {
+export class ListMoviesQueryDto extends PaginationQueryDto {
   @IsString()
   @IsOptional()
   search?: string;
@@ -10,17 +11,4 @@ export class ListMoviesQueryDto {
   @IsInt()
   @IsOptional()
   year?: number;
-
-  @Type(() => Number)
-  @IsInt()
-  @Min(1)
-  @IsOptional()
-  page: number = 1;
-
-  @Type(() => Number)
-  @IsInt()
-  @Min(1)
-  @Max(100)
-  @IsOptional()
-  limit: number = 20;
 }

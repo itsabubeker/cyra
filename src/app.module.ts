@@ -6,6 +6,7 @@ import { ConfigModule, ConfigService } from '@nestjs/config';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { MoviesModule } from './movies/movies.module.js';
 import { MetaDataModule } from './metadata/metadata.module.js';
+import { FilesModule } from './files/files.module.js';
 
 @Module({
   imports: [
@@ -22,6 +23,7 @@ import { MetaDataModule } from './metadata/metadata.module.js';
     }),
     MoviesModule,
     MetaDataModule,
+    FilesModule,
   ],
   controllers: [AppController],
   providers: [AppService],

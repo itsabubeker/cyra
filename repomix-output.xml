@@ -41,10 +41,28 @@ The content is organized as follows:
 
 <directory_structure>
 src/
+  common/
+    dto/
+      pagination-query.dto.ts
+  files/
+    dto/
+      list-files-query.dto.ts
+      manual-match.dto.ts
+    files.controller.ts
+    files.module.ts
+    files.service.ts
+  metadata/
+    dto/
+      search-tmdb.dto.ts
+    matcher.service.ts
+    metadata.controller.ts
+    metadata.module.ts
+    title-matcher.spec.ts
+    title-matcher.ts
+    tmdb.client.ts
   movies/
     dto/
-      create-movie.dto.ts
-      update-movie.dto.ts
+      list-movies-query.dto.ts
     entities/
       media-file.entity.ts
       movie.entity.ts
@@ -59,6 +77,7 @@ src/
     scanner.module.ts
     scanner.service.spec.ts
     scanner.service.ts
+    video-extensions.ts
   app.controller.spec.ts
   app.controller.ts
   app.module.ts
@@ -83,67 +102,654 @@ vitest.config.ts
 <files>
 This section contains the contents of the repository's files.
 
-<file path="src/movies/dto/create-movie.dto.ts">
-export class CreateMovieDto {}
+<file path="src/common/dto/pagination-query.dto.ts">
+import { Type } from 'class-transformer';
+import { IsInt, IsOptional, Max, Min } from 'class-validator';
+
+export class PaginationQueryDto {
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  @IsOptional()
+  page: number = 1;
+
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  @Max(100)
+  @IsOptional()
+  limit: number = 20;
+}
 </file>
 
-<file path="src/movies/dto/update-movie.dto.ts">
-import { PartialType } from '@nestjs/mapped-types';
-import { CreateMovieDto } from './create-movie.dto.js';
+<file path="src/files/dto/list-files-query.dto.ts">
+import { IsEnum, IsOptional } from 'class-validator';
+import { PaginationQueryDto } from '../../common/dto/pagination-query.dto.js';
+import { MatchStatus } from '../../movies/entities/media-file.entity.js';
 
-export class UpdateMovieDto extends PartialType(CreateMovieDto) {}
+export class ListFilesQueryDto extends PaginationQueryDto {
+  @IsEnum(MatchStatus, {
+    message: 'Match status must be a valid status (matched,unmatched,manual)',
+  })
+  @IsOptional()
+  status?: MatchStatus;
+}
 </file>
 
-<file path="src/movies/entities/media-file.entity.ts">
-// library/entities/media-file.entity.ts
+<file path="src/files/dto/manual-match.dto.ts">
+import { Type } from 'class-transformer';
+import { IsInt } from 'class-validator';
+
+export class ManualMatchDto {
+  @Type(() => Number)
+  @IsInt()
+  tmdbId: number;
+}
+</file>
+
+<file path="src/files/files.controller.ts">
 import {
-  Column,
-  Entity,
-  ManyToOne,
-  PrimaryGeneratedColumn,
-  type Relation,
-} from 'typeorm';
-import { Movie } from './movie.entity.js';
+  Controller,
+  Get,
+  Post,
+  Body,
+  Patch,
+  Param,
+  Delete,
+  Query,
+  ParseIntPipe,
+} from '@nestjs/common';
+import { FilesService } from './files.service.js';
+import { ListFilesQueryDto } from './dto/list-files-query.dto.js';
+import { ManualMatchDto } from './dto/manual-match.dto.js';
 
-export enum MatchStatus {
-  Unmatched = 'unmatched',
-  Matched = 'matched',
-  Manual = 'manual',
+@Controller('files')
+export class FilesController {
+  constructor(private readonly filesService: FilesService) {}
+
+  @Get()
+  async findAll(@Query() query: ListFilesQueryDto) {
+    const result = await this.filesService.findAll(query);
+
+    return {
+      items: result[0],
+      page: query.page,
+      limit: query.limit,
+      total: result[1],
+    };
+  }
+
+  @Get(':id')
+  findOne(@Param('id', ParseIntPipe) id: number) {
+    return this.filesService.findOne(id);
+  }
+
+  @Patch(':id/match')
+  manualMatch(
+    @Param('id', ParseIntPipe) id: number,
+    @Body() body: ManualMatchDto,
+  ) {
+    return this.filesService.manualMatch({ fileId: id, tmdbId: body.tmdbId });
+  }
+}
+</file>
+
+<file path="src/files/files.module.ts">
+import { Module } from '@nestjs/common';
+import { FilesService } from './files.service.js';
+import { FilesController } from './files.controller.js';
+import { MoviesModule } from '../movies/movies.module.js';
+import { MetaDataModule } from '../metadata/metadata.module.js';
+
+@Module({
+  imports: [MoviesModule, MetaDataModule],
+  controllers: [FilesController],
+  providers: [FilesService],
+})
+export class FilesModule {}
+</file>
+
+<file path="src/files/files.service.ts">
+import { Injectable, NotFoundException } from '@nestjs/common';
+import { InjectRepository } from '@nestjs/typeorm';
+import {
+  MatchStatus,
+  MediaFile,
+} from '../movies/entities/media-file.entity.js';
+import { FindOptionsWhere, Repository } from 'typeorm';
+import { ListFilesQueryDto } from './dto/list-files-query.dto.js';
+import { TmdbClient } from '../metadata/tmdb.client.js';
+import { Movie } from '../movies/entities/movie.entity.js';
+
+@Injectable()
+export class FilesService {
+  constructor(
+    @InjectRepository(MediaFile)
+    private readonly files: Repository<MediaFile>,
+    private readonly tmdbClient: TmdbClient,
+    @InjectRepository(Movie)
+    private readonly movies: Repository<Movie>,
+  ) {}
+
+  findAll({ status, limit, page }: ListFilesQueryDto) {
+    const where: FindOptionsWhere<MediaFile> = {};
+    if (status) where.matchStatus = status;
+
+    return this.files.findAndCount({
+      order: { parsedTitle: 'ASC', id: 'ASC' },
+      where,
+      take: limit,
+      skip: limit * (page - 1),
+    });
+  }
+
+  async findOne(id: number) {
+    const file = await this.files.findOne({
+      where: { id },
+      relations: { movie: true },
+    });
+    if (!file)
+      throw new NotFoundException(`Media file with ID ${id} not found `);
+    return file;
+  }
+  async manualMatch({ fileId, tmdbId }: { fileId: number; tmdbId: number }) {
+    const file = await this.files.findOne({
+      where: { id: fileId },
+      relations: { movie: true },
+    });
+    if (!file)
+      throw new NotFoundException(`Media file with ID ${fileId} not found `);
+
+    const tmdbMovie = await this.tmdbClient.getMovie(tmdbId);
+    if (!tmdbMovie)
+      throw new NotFoundException(`Tmdb movie with ID ${tmdbId} not found `);
+
+    let movie = await this.movies.findOneBy({ tmdbId });
+    if (!movie) {
+      movie = await this.movies.save({
+        tmdbId: tmdbMovie.id,
+        title: tmdbMovie.title,
+        year: tmdbMovie.year,
+        posterPath: tmdbMovie.posterPath,
+      });
+    }
+
+    file.movie = movie;
+    file.matchStatus = MatchStatus.Manual;
+
+    await this.files.save(file);
+
+    return file;
+  }
+}
+</file>
+
+<file path="src/metadata/dto/search-tmdb.dto.ts">
+import { Type } from 'class-transformer';
+import { IsInt, IsOptional, IsString, Length, Min } from 'class-validator';
+
+export class SearchTmdbDto {
+  @IsString()
+  @Length(1, 100)
+  title: string;
+
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  @IsOptional()
+  page?: number = 1;
+
+  @Type(() => Number)
+  @IsInt()
+  @IsOptional()
+  year?: number;
+}
+</file>
+
+<file path="src/metadata/matcher.service.ts">
+import { Injectable, Logger } from '@nestjs/common';
+import { TmdbClient } from './tmdb.client.js';
+import { InjectRepository } from '@nestjs/typeorm';
+import { Repository } from 'typeorm';
+import {
+  MatchStatus,
+  MediaFile,
+} from '../movies/entities/media-file.entity.js';
+import { Movie } from '../movies/entities/movie.entity.js';
+import {
+  Candidate,
+  Parsed,
+  pickBest,
+  scoreCandidate,
+} from './title-matcher.js';
+
+const SCORE_THRESHOLD = 0.8;
+
+@Injectable()
+export class MatcherService {
+  private readonly logger = new Logger(MatcherService.name);
+
+  constructor(
+    private readonly tmdbClient: TmdbClient,
+    @InjectRepository(MediaFile)
+    private readonly files: Repository<MediaFile>,
+    @InjectRepository(Movie)
+    private readonly movies: Repository<Movie>,
+  ) {}
+
+  async matchAll() {
+    const mediaFiles = await this.files.find({
+      where: { matchStatus: MatchStatus.Unmatched },
+    });
+
+    let matched = 0;
+    const unmatched: {
+      title: string;
+      relativePath: string;
+      cause: string;
+      candidates?: Candidate[];
+    }[] = [];
+    const failed: {
+      title: string;
+      relativePath: string;
+      cause: string;
+    }[] = [];
+
+    for (const file of mediaFiles) {
+      try {
+        const parsed: Parsed = {
+          title: file.parsedTitle,
+          year: file.parsedYear,
+        };
+        const searchResult = await this.tmdbClient.searchMovie({
+          title: parsed.title,
+          year: parsed.year ?? undefined,
+        });
+        const candidates = searchResult.items;
+
+        if (candidates.length <= 0) {
+          const cause = `No match for "${file.parsedTitle}" (${file.parsedYear})`;
+
+          this.logger.warn(cause);
+          unmatched.push({
+            title: file.parsedTitle,
+            relativePath: file.relativePath,
+            cause,
+          });
+          continue;
+        }
+
+        const best = pickBest(parsed, candidates);
+
+        if (!best || best.score < SCORE_THRESHOLD) {
+          const cause = `No close match for "${file.parsedTitle}" (${file.parsedYear})`;
+
+          this.logger.warn(cause);
+          unmatched.push({
+            title: file.parsedTitle,
+            relativePath: file.relativePath,
+            cause,
+            candidates: candidates
+              .map((c) => ({ ...c, score: scoreCandidate(parsed, c) }))
+              .sort((a, b) => b.score - a.score)
+              .slice(0, 3),
+          });
+          continue;
+        }
+
+        let movie = await this.movies.findOneBy({ tmdbId: best.candidate.id });
+        if (!movie) {
+          movie = await this.movies.save({
+            tmdbId: best.candidate.id,
+            title: best.candidate.title,
+            year: best.candidate.year,
+            posterPath: best.candidate.posterPath,
+          });
+        }
+
+        file.movie = movie;
+        file.matchStatus = MatchStatus.Matched;
+        file.matchScore = best.score;
+        await this.files.save(file);
+        matched++;
+      } catch (e) {
+        if (e instanceof Error) {
+          this.logger.error(
+            `Matching file ${file.parsedTitle} failed Error:${e.message}`,
+          );
+          failed.push({
+            title: file.parsedTitle,
+            relativePath: file.relativePath,
+            cause: `Matching file ${file.parsedTitle} failed Error:${e.message}`,
+          });
+        } else {
+          this.logger.error(e);
+          failed.push({
+            title: file.parsedTitle,
+            relativePath: file.relativePath,
+            cause: 'Unknown error occured',
+          });
+        }
+      }
+    }
+
+    return { total: mediaFiles.length, matched, unmatched, failed };
+  }
+}
+</file>
+
+<file path="src/metadata/metadata.controller.ts">
+import { Controller, Get, HttpCode, Post, Query } from '@nestjs/common';
+import { MatcherService } from './matcher.service.js';
+import { SearchTmdbDto } from './dto/search-tmdb.dto.js';
+import { TmdbClient } from './tmdb.client.js';
+
+@Controller('matcher')
+export class MetaDataController {
+  constructor(
+    private readonly matcherService: MatcherService,
+    private readonly tmdbClient: TmdbClient,
+  ) {}
+
+  @Post('/matchall')
+  @HttpCode(200)
+  async matchAll() {
+    return await this.matcherService.matchAll();
+  }
+
+  @Get('/search-tmdb')
+  async searchTmdb(@Query() query: SearchTmdbDto) {
+    return await this.tmdbClient.searchMovie(query);
+  }
+}
+</file>
+
+<file path="src/metadata/title-matcher.spec.ts">
+import {
+  dice,
+  normalizeTitle,
+  pickBest,
+  scoreCandidate,
+} from './title-matcher.js';
+
+describe('normalizeTitle', () => {
+  it.each([
+    ['Mission Impossible III', 'Mission: Impossible III'],
+    ['I Love You Man', 'I Love You, Man'],
+    ['L A Confidential', 'L.A. Confidential'],
+    ['Amelie', 'Amélie'],
+    ['Leon the Professional', 'Léon: The Professional'],
+    ['Good Luck Have Fun Dont Die', "Good Luck, Have Fun, Don't Die"],
+    ['Spider Man Brand New Day', 'Spider-Man: Brand New Day'],
+    [
+      'Captain America - The Winter Soldier',
+      'Captain America: The Winter Soldier',
+    ],
+    ['Pans Labyrinth', "Pan's Labyrinth"],
+  ])('%s equals %s', (parsed, tmdb) => {
+    expect(normalizeTitle(parsed)).toBe(normalizeTitle(tmdb));
+  });
+});
+
+describe('dice', () => {
+  it('is 1 for identical strings and 0 for unrelated ones', () => {
+    expect(dice('heat', 'heat')).toBe(1);
+    expect(dice('heat', 'zzzz')).toBe(0);
+  });
+
+  it('scores spelling variants high', () => {
+    expect(
+      dice('inglourious bastards', 'inglourious basterds'),
+    ).toBeGreaterThan(0.85);
+  });
+
+  it('scores a sequel lower than the original', () => {
+    expect(dice('ted', 'ted 2')).toBeLessThan(0.8);
+  });
+});
+
+describe('pickBest', () => {
+  it('uses the year to separate The Batman from Batman', () => {
+    const best = pickBest({ title: 'The Batman', year: 2022 }, [
+      { title: 'Batman', year: 1989 },
+      { title: 'The Batman', year: 2022 },
+    ]);
+    expect(best?.candidate.year).toBe(2022);
+  });
+
+  it('tolerates a one-year difference', () => {
+    const score = scoreCandidate(
+      { title: 'Rush', year: 2013 },
+      { title: 'Rush', year: 2014 },
+    );
+    expect(score).toBeGreaterThan(0.9);
+  });
+
+  it('works without a year (Blade Runner 2049)', () => {
+    const best = pickBest({ title: 'Blade Runner 2049', year: null }, [
+      { title: 'Blade Runner', year: 1982 },
+      { title: 'Blade Runner 2049', year: 2017 },
+    ]);
+    expect(best?.candidate.year).toBe(2017);
+  });
+
+  it('scores a foreign title low so it stays unmatched', () => {
+    const score = scoreCandidate(
+      { title: 'Millennium Uomini che Odiano Le Donne', year: 2011 },
+      {
+        title: 'The Girl with the Dragon Tattoo',
+        originalTitle: 'Män som hatar kvinnor',
+        year: 2011,
+      },
+    );
+    expect(score).toBeLessThan(0.5);
+  });
+
+  it('returns null for no candidates', () => {
+    expect(pickBest({ title: 'Heat', year: 1995 }, [])).toBeNull();
+  });
+});
+</file>
+
+<file path="src/metadata/title-matcher.ts">
+export interface Parsed {
+  title: string;
+  year: number | null;
 }
 
-@Entity()
-export class MediaFile {
-  @PrimaryGeneratedColumn()
-  id!: number;
+export interface Candidate {
+  title: string;
+  originalTitle?: string;
+  year: number | null;
+}
 
-  // relative to MEDIA_DIR, so it survives the Docker mount change
-  @Column({ unique: true })
-  relativePath!: string;
+export function normalizeTitle(raw: string): string {
+  return raw
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/\p{M}/gu, '') // strip diacritics: Amélie -> amelie
+    .replace(/['’]/g, '') // don't -> dont, pan's -> pans
+    .replace(/&/g, ' and ')
+    .replace(/[^a-z0-9]+/g, ' ') // punctuation -> single space
+    .trim()
+    .replace(/^the /, '');
+}
 
-  @Column()
-  parsedTitle!: string;
+function bigrams(s: string): Map<string, number> {
+  const m = new Map<string, number>();
+  for (let i = 0; i < s.length - 1; i++) {
+    const g = s.slice(i, i + 2);
+    m.set(g, (m.get(g) ?? 0) + 1);
+  }
+  return m;
+}
 
-  @Column({ type: 'integer', nullable: true })
-  parsedYear!: number | null;
+/** Dice coefficient on character bigrams, 0..1. Inputs should be normalized. */
+export function dice(a: string, b: string): number {
+  if (!a || !b) return 0;
+  if (a === b) return 1;
+  if (a.length < 2 || b.length < 2) return 0;
+  const A = bigrams(a);
+  const B = bigrams(b);
+  let overlap = 0;
+  for (const [g, n] of A) overlap += Math.min(n, B.get(g) ?? 0);
+  return (2 * overlap) / (a.length - 1 + (b.length - 1));
+}
 
-  @Column({ type: 'integer' })
-  sizeBytes!: number;
+function yearPenalty(a: number | null, b: number | null): number {
+  if (a === null || b === null) return 0; // no year: no evidence either way
+  const diff = Math.abs(a - b);
+  if (diff === 0) return 0;
+  if (diff === 1) return 0.05; // festival vs. release year
+  return 0.25;
+}
 
-  @Column({
-    type: 'simple-enum',
-    enum: MatchStatus,
-    default: MatchStatus.Unmatched,
-  })
-  matchStatus!: MatchStatus;
+export function scoreCandidate(parsed: Parsed, cand: Candidate): number {
+  const p = normalizeTitle(parsed.title);
+  const titleScore = Math.max(
+    dice(p, normalizeTitle(cand.title)),
+    cand.originalTitle ? dice(p, normalizeTitle(cand.originalTitle)) : 0,
+  );
+  return Math.max(0, titleScore - yearPenalty(parsed.year, cand.year));
+}
 
-  @Column({ type: 'real', nullable: true })
-  matchScore!: number | null;
+export function pickBest<T extends Candidate>(
+  parsed: Parsed,
+  candidates: T[],
+): { candidate: T; score: number } | null {
+  let best: { candidate: T; score: number } | null = null;
+  for (const candidate of candidates) {
+    const score = scoreCandidate(parsed, candidate);
+    if (!best || score > best.score) best = { candidate, score };
+  }
+  return best;
+}
+</file>
 
-  @ManyToOne(() => Movie, (movie) => movie.files, {
-    nullable: true,
-    onDelete: 'SET NULL',
-  })
-  movie!: Relation<Movie> | null;
+<file path="src/metadata/tmdb.client.ts">
+import { Injectable, Logger } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
+import { SearchTmdbDto } from './dto/search-tmdb.dto.js';
+
+export interface TmdbMovie {
+  id: number;
+  title: string;
+  originalTitle: string;
+  year: number | null;
+  posterPath: string | null;
+}
+interface TmdbSearchResponse {
+  results: {
+    id: number;
+    title: string;
+    original_title: string;
+    release_date: string; // '' when unknown
+    poster_path: string | null;
+  }[];
+  page: number;
+  total_pages: number;
+  total_results: number;
+}
+
+export interface TmdbMovieDetails {
+  adult: boolean;
+  backdrop_path: string | null;
+  budget: number;
+  homepage: string | null;
+  id: number;
+  imdb_id: string | null;
+  origin_country: string[];
+  original_language: string;
+  original_title: string;
+  overview: string | null;
+  popularity: number;
+  poster_path: string | null;
+  release_date: string; // "" when unknown, not null
+  revenue: number;
+  runtime: number | null;
+  softcore: boolean;
+  status: string;
+  tagline: string | null;
+  title: string;
+  video: boolean;
+  vote_average: number;
+  vote_count: number;
+}
+
+@Injectable()
+export class TmdbClient {
+  private readonly token: string;
+  private readonly logger = new Logger(TmdbClient.name);
+  constructor(config: ConfigService) {
+    this.token = config.getOrThrow<string>('TMDB_API_KEY');
+  }
+  async searchMovie({ title, year, page }: SearchTmdbDto): Promise<{
+    items: TmdbMovie[];
+    page: number;
+    totalPages: number;
+    totalResults: number;
+  }> {
+    const params = new URLSearchParams({ query: title });
+    if (year) params.set('year', String(year));
+    if (page) params.set('page', String(page));
+
+    const res = await fetch(
+      `https://api.themoviedb.org/3/search/movie?${params}`,
+      {
+        headers: { Authorization: `Bearer ${this.token}` },
+      },
+    );
+    if (!res.ok) throw new Error(`TMDB ${res.status}: ${await res.text()}`);
+
+    const data = (await res.json()) as TmdbSearchResponse;
+
+    return {
+      items: data.results.map((r) => ({
+        id: r.id,
+        title: r.title,
+        originalTitle: r.original_title,
+        year: r.release_date ? Number(r.release_date.slice(0, 4)) : null,
+        posterPath: r.poster_path,
+      })),
+      page: data.page,
+      totalPages: data.total_pages,
+      totalResults: data.total_results,
+    };
+  }
+
+  async getMovie(id: number): Promise<TmdbMovie> {
+    const res = await fetch(`https://api.themoviedb.org/3/movie/${id}`, {
+      headers: { Authorization: `Bearer ${this.token}` },
+    });
+    if (!res.ok) throw new Error(`TMDB ${res.status}: ${await res.text()}`);
+
+    const movie = (await res.json()) as TmdbMovieDetails;
+
+    return {
+      id: movie.id,
+      title: movie.title,
+      originalTitle: movie.original_title,
+      year: movie.release_date ? Number(movie.release_date.slice(0, 4)) : null,
+      posterPath: movie.poster_path,
+    };
+  }
+}
+</file>
+
+<file path="src/movies/dto/list-movies-query.dto.ts">
+import { Type } from 'class-transformer';
+import { IsInt, IsOptional, IsString, Max, Min } from 'class-validator';
+import { PaginationQueryDto } from '../../common/dto/pagination-query.dto.js';
+
+export class ListMoviesQueryDto extends PaginationQueryDto {
+  @IsString()
+  @IsOptional()
+  search?: string;
+
+  @Type(() => Number)
+  @IsInt()
+  @IsOptional()
+  year?: number;
 }
 </file>
 
@@ -179,26 +785,6 @@ export class Movie {
 }
 </file>
 
-<file path="src/movies/movies.controller.ts">
-import { Controller, Get, Param } from '@nestjs/common';
-import { MoviesService } from './movies.service.js';
-
-@Controller('movies')
-export class MoviesController {
-  constructor(private readonly moviesService: MoviesService) {}
-
-  @Get()
-  findAll() {
-    return this.moviesService.findAll();
-  }
-
-  @Get(':id')
-  findOne(@Param('id') id: string) {
-    return this.moviesService.findOne(+id);
-  }
-}
-</file>
-
 <file path="src/movies/movies.module.ts">
 import { Module } from '@nestjs/common';
 import { MoviesService } from './movies.service.js';
@@ -214,26 +800,6 @@ import { MediaFile } from './entities/media-file.entity.js';
   exports: [TypeOrmModule],
 })
 export class MoviesModule {}
-</file>
-
-<file path="src/movies/movies.service.ts">
-import { Injectable } from '@nestjs/common';
-import { CreateMovieDto } from './dto/create-movie.dto.js';
-
-@Injectable()
-export class MoviesService {
-  create(createMovieDto: CreateMovieDto) {
-    return 'This action adds a new movie';
-  }
-
-  findAll() {
-    return `This action returns all movies`;
-  }
-
-  findOne(id: number) {
-    return `This action returns a #${id} movie`;
-  }
-}
 </file>
 
 <file path="src/scanner/filenameParser.spec.ts">
@@ -280,12 +846,14 @@ describe('parseFilename', () => {
 </file>
 
 <file path="src/scanner/filenameParser.ts">
+import { VIDEO_EXTS } from './video-extensions.js';
+
 export interface ParsedFilename {
   title: string;
   year: number | null;
 }
 
-const VIDEO_EXTENSION = /\.(mkv|mp4|avi|mov|wmv|m4v|webm|ts)$/i;
+const VIDEO_EXTENSION = new RegExp(`\\.(${VIDEO_EXTS.join('|')})$`, 'i');
 
 const EDITION_SUFFIX =
   /(\s+(extended|unrated|director'?s? cut|remastered|theatrical|special edition))+$/i;
@@ -347,74 +915,125 @@ export function parseFilename(filename: string): ParsedFilename {
 </file>
 
 <file path="src/scanner/scanner.controller.spec.ts">
-import { Test, TestingModule } from '@nestjs/testing';
+import { Test } from '@nestjs/testing';
 import { ScannerController } from './scanner.controller.js';
+import { ScannerService } from './scanner.service.js';
 
 describe('ScannerController', () => {
   let controller: ScannerController;
 
   beforeEach(async () => {
-    const module: TestingModule = await Test.createTestingModule({
+    const moduleRef = await Test.createTestingModule({
       controllers: [ScannerController],
+      providers: [{ provide: ScannerService, useValue: { scan: vi.fn() } }],
     }).compile();
 
-    controller = module.get<ScannerController>(ScannerController);
+    controller = moduleRef.get(ScannerController);
   });
 
-  it('should be defined', () => {
+  it('is defined', () => {
     expect(controller).toBeDefined();
   });
 });
 </file>
 
-<file path="src/scanner/scanner.controller.ts">
-import { Controller, Get, HttpCode, Post } from '@nestjs/common';
-import { ScannerService } from './scanner.service.js';
-
-@Controller('scanner')
-export class ScannerController {
-  constructor(private readonly scannerService: ScannerService) {}
-
-  @Post()
-  @HttpCode(200)
-  async scan() {
-    const items = await this.scannerService.scan();
-    return { count: items.length, items };
-  }
-}
-</file>
-
-<file path="src/scanner/scanner.module.ts">
-import { Module } from '@nestjs/common';
-import { ScannerService } from './scanner.service.js';
-import { ScannerController } from './scanner.controller.js';
-import { MoviesModule } from '../movies/movies.module.js';
-
-@Module({
-  imports: [MoviesModule],
-  providers: [ScannerService],
-  controllers: [ScannerController],
-})
-export class ScannerModule {}
-</file>
-
 <file path="src/scanner/scanner.service.spec.ts">
+import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
+import os from 'node:os';
+import path from 'node:path';
 import { Test, TestingModule } from '@nestjs/testing';
+import { ConfigService } from '@nestjs/config';
+import { getRepositoryToken } from '@nestjs/typeorm';
 import { ScannerService } from './scanner.service.js';
+import { MediaFile } from '../movies/entities/media-file.entity.js';
 
 describe('ScannerService', () => {
   let service: ScannerService;
+  let tempDir: string;
+  let files: {
+    find: ReturnType<typeof vi.fn>;
+    delete: ReturnType<typeof vi.fn>;
+    upsert: ReturnType<typeof vi.fn>;
+  };
 
   beforeEach(async () => {
+    tempDir = await mkdtemp(path.join(os.tmpdir(), 'scanner-test-'));
+
+    files = {
+      find: vi.fn().mockResolvedValue([]),
+      delete: vi.fn(),
+      upsert: vi.fn(),
+    };
+
     const module: TestingModule = await Test.createTestingModule({
-      providers: [ScannerService],
+      providers: [
+        ScannerService,
+        {
+          provide: ConfigService,
+          useValue: { getOrThrow: vi.fn().mockReturnValue(tempDir) },
+        },
+        { provide: getRepositoryToken(MediaFile), useValue: files },
+      ],
     }).compile();
 
     service = module.get<ScannerService>(ScannerService);
   });
 
+  afterEach(async () => {
+    await rm(tempDir, { recursive: true, force: true });
+  });
+
   it('should be defined', () => {
     expect(service).toBeDefined();
+  });
+
+  it('upserts a row for each video file', async () => {
+    await writeFile(path.join(tempDir, 'Heat (1995).mkv'), '');
+
+    await service.scan();
+
+    expect(files.upsert).toHaveBeenCalledWith(
+      [
+        expect.objectContaining({
+          relativePath: 'Heat (1995).mkv',
+          parsedTitle: 'Heat',
+          parsedYear: 1995,
+        }),
+      ],
+      ['relativePath'],
+    );
+  });
+  it('ignores video files inside extras folders', async () => {
+    await writeFile(path.join(tempDir, 'Heat (1995).mkv'), '');
+    await mkdir(path.join(tempDir, 'Extras'));
+    await writeFile(path.join(tempDir, 'Extras', 'Making Of (1995).mkv'), '');
+
+    await service.scan();
+
+    expect(files.upsert).toHaveBeenCalledWith(
+      [expect.objectContaining({ relativePath: 'Heat (1995).mkv' })],
+      ['relativePath'],
+    );
+  });
+
+  it('deletes rows whose file no longer exists', async () => {
+    await writeFile(path.join(tempDir, 'Heat (1995).mkv'), '');
+    files.find.mockResolvedValue([
+      { id: 1, relativePath: 'Heat (1995).mkv' },
+      { id: 7, relativePath: 'Gone (2000).mkv' },
+    ]);
+
+    await service.scan();
+
+    expect(files.delete).toHaveBeenCalledWith([7]);
+  });
+
+  it('never deletes anything when the scan finds no files', async () => {
+    files.find.mockResolvedValue([{ id: 7, relativePath: 'Gone (2000).mkv' }]);
+
+    await service.scan();
+
+    expect(files.delete).not.toHaveBeenCalled();
   });
 });
 </file>
@@ -428,19 +1047,14 @@ import { parseFilename } from './filenameParser.js';
 import { InjectRepository } from '@nestjs/typeorm';
 import { MediaFile } from '../movies/entities/media-file.entity.js';
 import { Repository } from 'typeorm';
+import { VIDEO_EXTS as VIDEO_EXTENSIONS } from './video-extensions.js';
 
-const VIDEO_EXTS = new Set([
-  '.mp4',
-  '.mkv',
-  '.mov',
-  '.avi',
-  '.webm',
-  '.flv',
-  '.wmv',
-  '.m4v',
-  '.mpg',
-  '.mpeg',
-]);
+const VIDEO_EXTS = new Set<string>(VIDEO_EXTENSIONS);
+
+type ScanRow = Pick<
+  MediaFile,
+  'relativePath' | 'parsedTitle' | 'parsedYear' | 'sizeBytes'
+>;
 
 const EXTRAS_DIRS = new Set([
   'featurettes',
@@ -464,7 +1078,7 @@ const scanDir = async (dir: string): Promise<VideoFile[]> => {
   const entries = await readdir(dir, { withFileTypes: true, recursive: true });
 
   const isVideo = (name: string) =>
-    VIDEO_EXTS.has(path.extname(name).toLowerCase());
+    VIDEO_EXTS.has(path.extname(name).slice(1).toLowerCase());
 
   const videos = entries.filter((e) => {
     const inExtras = path
@@ -495,12 +1109,27 @@ export class ScannerService {
     private readonly files: Repository<MediaFile>,
   ) {}
 
+  private async removeStale(rows: ScanRow[]): Promise<number> {
+    if (rows.length === 0) return 0; // safety: never wipe the table on an empty scan
+
+    const seen = new Set(rows.map((r) => r.relativePath));
+    const existing = await this.files.find({
+      select: { id: true, relativePath: true },
+    });
+    const staleIds = existing
+      .filter((e) => !seen.has(e.relativePath))
+      .map((e) => e.id);
+
+    if (staleIds.length > 0) await this.files.delete(staleIds);
+    return staleIds.length;
+  }
+
   async scan() {
     const mediaDir = this.configService.getOrThrow<string>('MEDIA_DIR');
 
     const videos = await scanDir(mediaDir);
 
-    const items = videos.map((video) => {
+    const rows = videos.map((video) => {
       const fromFile = parseFilename(video.name);
       const fromFolder = parseFilename(path.basename(path.dirname(video.path)));
 
@@ -517,15 +1146,37 @@ export class ScannerService {
       };
     });
 
-    for (let i = 0; i < items.length; i += 200) {
-      await this.files.upsert(items.slice(i, i + 200), ['relativePath']);
+    for (let i = 0; i < rows.length; i += 200) {
+      const batch = rows.slice(i, i + 200).map((r) => ({ ...r }));
+      await this.files.upsert(batch, ['relativePath']);
     }
 
-    this.logger.log(`Scanned ${items.length} video files in ${mediaDir}`);
+    const removed = await this.removeStale(rows);
 
-    return items;
+    this.logger.log(
+      `Scanned ${rows.length} video files in ${mediaDir}, removed ${removed} stale`,
+    );
+
+    const items = await this.files.find({ order: { relativePath: 'ASC' } });
+    return { count: items.length, items };
   }
 }
+</file>
+
+<file path="src/scanner/video-extensions.ts">
+export const VIDEO_EXTS = [
+  'mkv',
+  'mp4',
+  'avi',
+  'mov',
+  'wmv',
+  'm4v',
+  'webm',
+  'ts',
+  'flv',
+  'mpg',
+  'mpeg',
+] as const;
 </file>
 
 <file path="src/app.controller.spec.ts">
@@ -568,36 +1219,6 @@ export class AppController {
 }
 </file>
 
-<file path="src/app.module.ts">
-import { Module } from '@nestjs/common';
-import { AppController } from './app.controller.js';
-import { AppService } from './app.service.js';
-import { ScannerModule } from './scanner/scanner.module.js';
-import { ConfigModule, ConfigService } from '@nestjs/config';
-import { TypeOrmModule } from '@nestjs/typeorm';
-import { MoviesModule } from './movies/movies.module.js';
-
-@Module({
-  imports: [
-    ScannerModule,
-    ConfigModule.forRoot({ isGlobal: true }),
-    TypeOrmModule.forRootAsync({
-      inject: [ConfigService],
-      useFactory: (config: ConfigService) => ({
-        type: 'better-sqlite3',
-        database: config.get<string>('DB_PATH', 'data/media.db'),
-        autoLoadEntities: true,
-        synchronize: true, // dev only, see note below
-      }),
-    }),
-    MoviesModule,
-  ],
-  controllers: [AppController],
-  providers: [AppService],
-})
-export class AppModule {}
-</file>
-
 <file path="src/app.service.ts">
 import { Injectable } from '@nestjs/common';
 
@@ -607,17 +1228,6 @@ export class AppService {
     return 'Hello World!';
   }
 }
-</file>
-
-<file path="src/main.ts">
-import { NestFactory } from '@nestjs/core';
-import { AppModule } from './app.module.js';
-
-async function bootstrap() {
-  const app = await NestFactory.create(AppModule);
-  await app.listen(process.env.PORT ?? 3000);
-}
-await bootstrap();
 </file>
 
 <file path="test/app.e2e-spec.ts">
@@ -762,64 +1372,6 @@ When a task depends on how the app behaves in production - an error users hit, a
   "sourceRoot": "src",
   "compilerOptions": {
     "deleteOutDir": true
-  }
-}
-</file>
-
-<file path="package.json">
-{
-  "name": "media-server",
-  "version": "0.0.1",
-  "description": "",
-  "author": "",
-  "private": true,
-  "license": "UNLICENSED",
-  "type": "module",
-  "scripts": {
-    "build": "nest build",
-    "deploy": "nest deploy",
-    "format": "prettier --write \"src/**/*.ts\" \"test/**/*.ts\"",
-    "start": "nest start",
-    "start:dev": "nest start --watch",
-    "start:debug": "nest start --debug --watch",
-    "start:prod": "node dist/main",
-    "lint": "oxlint --type-aware src/ test/",
-    "test": "vitest run",
-    "test:watch": "vitest",
-    "test:cov": "vitest run --coverage",
-    "test:debug": "vitest --inspect-brk --no-file-parallelism",
-    "test:e2e": "vitest run --config ./vitest.config.e2e.ts"
-  },
-  "dependencies": {
-    "@nestjs/common": "^12.0.1",
-    "@nestjs/config": "^12.0.1",
-    "@nestjs/core": "^12.0.1",
-    "@nestjs/mapped-types": "*",
-    "@nestjs/platform-express": "^12.0.1",
-    "@nestjs/typeorm": "^12.0.2",
-    "better-sqlite3": "^12.11.1",
-    "reflect-metadata": "^0.2.2",
-    "rxjs": "^7.8.1",
-    "typeorm": "^1.1.2"
-  },
-  "devDependencies": {
-    "@nestjs/cli": "^12.0.0",
-    "@nestjs/mau": "^0.2.6",
-    "@nestjs/schematics": "^12.0.0",
-    "@nestjs/testing": "^12.0.1",
-    "@types/better-sqlite3": "^9.6.0",
-    "@types/express": "^5.0.0",
-    "@types/node": "^24.0.0",
-    "@types/supertest": "^7.0.0",
-    "@vitest/coverage-v8": "^4.1.2",
-    "oxlint": "^1.58.0",
-    "oxlint-tsgolint": "^7.0.2001",
-    "prettier": "^3.4.2",
-    "source-map-support": "^0.5.21",
-    "supertest": "^7.0.0",
-    "typescript": "^6.0.2",
-    "vite": "^8.0.0",
-    "vitest": "^4.1.2"
   }
 }
 </file>
@@ -1022,6 +1574,285 @@ export default defineConfig({
     include: ['**/*.spec.ts'],
   },
 });
+</file>
+
+<file path="src/metadata/metadata.module.ts">
+import { Module } from '@nestjs/common';
+import { MoviesModule } from '../movies/movies.module.js';
+import { MatcherService } from './matcher.service.js';
+import { MetaDataController } from './metadata.controller.js';
+import { TmdbClient } from './tmdb.client.js';
+
+@Module({
+  imports: [MoviesModule],
+  controllers: [MetaDataController],
+  providers: [TmdbClient, MatcherService],
+  exports: [TmdbClient],
+})
+export class MetaDataModule {}
+</file>
+
+<file path="src/movies/entities/media-file.entity.ts">
+import {
+  Column,
+  Entity,
+  ManyToOne,
+  PrimaryGeneratedColumn,
+  type Relation,
+} from 'typeorm';
+import { Movie } from './movie.entity.js';
+
+export enum MatchStatus {
+  Unmatched = 'unmatched',
+  Matched = 'matched',
+  Manual = 'manual',
+}
+
+@Entity()
+export class MediaFile {
+  @PrimaryGeneratedColumn()
+  id!: number;
+
+  // relative to MEDIA_DIR, so it survives the Docker mount change
+  @Column({ unique: true })
+  relativePath!: string;
+
+  @Column()
+  parsedTitle!: string;
+
+  @Column({ type: 'integer', nullable: true })
+  parsedYear!: number | null;
+
+  @Column({ type: 'integer' })
+  sizeBytes!: number;
+
+  @Column({
+    type: 'simple-enum',
+    enum: MatchStatus,
+    default: MatchStatus.Unmatched,
+  })
+  matchStatus!: MatchStatus;
+
+  @Column({ type: 'real', nullable: true })
+  matchScore!: number | null;
+
+  @ManyToOne(() => Movie, (movie) => movie.files, {
+    nullable: true,
+    onDelete: 'SET NULL',
+  })
+  movie!: Relation<Movie> | null;
+}
+</file>
+
+<file path="src/movies/movies.controller.ts">
+import { Controller, Get, Param, ParseIntPipe, Query } from '@nestjs/common';
+import { MoviesService } from './movies.service.js';
+import { ListMoviesQueryDto } from './dto/list-movies-query.dto.js';
+
+@Controller('movies')
+export class MoviesController {
+  constructor(private readonly moviesService: MoviesService) {}
+
+  @Get()
+  async findAll(@Query() query: ListMoviesQueryDto) {
+    const result = await this.moviesService.findAll(query);
+
+    return {
+      items: result[0],
+      page: query.page,
+      limit: query.limit,
+      total: result[1],
+    };
+  }
+
+  @Get(':id')
+  findOne(@Param('id', ParseIntPipe) id: number) {
+    return this.moviesService.findOne(id);
+  }
+}
+</file>
+
+<file path="src/movies/movies.service.ts">
+import { Injectable, NotFoundException } from '@nestjs/common';
+import { InjectRepository } from '@nestjs/typeorm';
+import { Movie } from './entities/movie.entity.js';
+import { FindOptionsWhere, Like, Repository } from 'typeorm';
+import { ListMoviesQueryDto } from './dto/list-movies-query.dto.js';
+
+@Injectable()
+export class MoviesService {
+  constructor(
+    @InjectRepository(Movie)
+    private readonly movies: Repository<Movie>,
+  ) {}
+
+  findAll({ search, year, limit, page }: ListMoviesQueryDto) {
+    const where: FindOptionsWhere<Movie> = {};
+    if (search) where.title = Like(`%${search}%`);
+    if (year) where.year = year;
+
+    return this.movies.findAndCount({
+      order: { title: 'ASC', id: 'ASC' },
+      where,
+      take: limit,
+      skip: limit * (page - 1),
+    });
+  }
+
+  async findOne(id: number) {
+    const movie = await this.movies.findOne({
+      where: { id },
+      relations: { files: true },
+    });
+    if (!movie) throw new NotFoundException(`Movie with ID ${id} not found `);
+    return movie;
+  }
+}
+</file>
+
+<file path="src/scanner/scanner.controller.ts">
+import { Controller, HttpCode, Post } from '@nestjs/common';
+import { ScannerService } from './scanner.service.js';
+
+@Controller('scanner')
+export class ScannerController {
+  constructor(private readonly scannerService: ScannerService) {}
+
+  @Post()
+  @HttpCode(200)
+  async scan() {
+    return await this.scannerService.scan();
+  }
+}
+</file>
+
+<file path="src/scanner/scanner.module.ts">
+import { Module } from '@nestjs/common';
+import { MoviesModule } from '../movies/movies.module.js';
+import { ScannerController } from './scanner.controller.js';
+import { ScannerService } from './scanner.service.js';
+
+@Module({
+  imports: [MoviesModule],
+  providers: [ScannerService],
+  controllers: [ScannerController],
+})
+export class ScannerModule {}
+</file>
+
+<file path="src/app.module.ts">
+import { Module } from '@nestjs/common';
+import { AppController } from './app.controller.js';
+import { AppService } from './app.service.js';
+import { ScannerModule } from './scanner/scanner.module.js';
+import { ConfigModule, ConfigService } from '@nestjs/config';
+import { TypeOrmModule } from '@nestjs/typeorm';
+import { MoviesModule } from './movies/movies.module.js';
+import { MetaDataModule } from './metadata/metadata.module.js';
+import { FilesModule } from './files/files.module.js';
+
+@Module({
+  imports: [
+    ScannerModule,
+    ConfigModule.forRoot({ isGlobal: true }),
+    TypeOrmModule.forRootAsync({
+      inject: [ConfigService],
+      useFactory: (config: ConfigService) => ({
+        type: 'better-sqlite3',
+        database: config.get<string>('DB_PATH', 'data/media.db'),
+        autoLoadEntities: true,
+        synchronize: true, // dev only, see note below
+      }),
+    }),
+    MoviesModule,
+    MetaDataModule,
+    FilesModule,
+  ],
+  controllers: [AppController],
+  providers: [AppService],
+})
+export class AppModule {}
+</file>
+
+<file path="src/main.ts">
+import { NestFactory } from '@nestjs/core';
+import { AppModule } from './app.module.js';
+import { ValidationPipe } from '@nestjs/common';
+
+async function bootstrap() {
+  const app = await NestFactory.create(AppModule);
+  app.useGlobalPipes(new ValidationPipe({ whitelist: true, transform: true }));
+  await app.listen(process.env.PORT ?? 3000);
+}
+await bootstrap();
+</file>
+
+<file path="package.json">
+{
+  "name": "cyra",
+  "version": "0.1.0",
+  "description": "Self-hosted movie library and streaming server built with NestJS.",
+  "keywords": [
+    "media-server",
+    "self-hosted",
+    "nestjs",
+    "tmdb",
+    "streaming",
+    "movies"
+  ],
+  "license": "MIT",
+  "author": "abubeker abduljelil",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "nest build",
+    "deploy": "nest deploy",
+    "format": "prettier --write \"src/**/*.ts\" \"test/**/*.ts\"",
+    "start": "nest start",
+    "start:dev": "nest start --watch",
+    "start:debug": "nest start --debug --watch",
+    "start:prod": "node dist/main",
+    "lint": "oxlint --type-aware src/ test/",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:cov": "vitest run --coverage",
+    "test:debug": "vitest --inspect-brk --no-file-parallelism",
+    "test:e2e": "vitest run --config ./vitest.config.e2e.ts"
+  },
+  "dependencies": {
+    "@nestjs/common": "^12.0.1",
+    "@nestjs/config": "^12.0.1",
+    "@nestjs/core": "^12.0.1",
+    "@nestjs/mapped-types": "*",
+    "@nestjs/platform-express": "^12.0.1",
+    "@nestjs/typeorm": "^12.0.2",
+    "better-sqlite3": "^12.11.1",
+    "class-transformer": "^0.5.1",
+    "class-validator": "^0.15.1",
+    "reflect-metadata": "^0.2.2",
+    "rxjs": "^7.8.1",
+    "typeorm": "^1.1.2"
+  },
+  "devDependencies": {
+    "@nestjs/cli": "^12.0.0",
+    "@nestjs/mau": "^0.2.6",
+    "@nestjs/schematics": "^12.0.0",
+    "@nestjs/testing": "^12.0.1",
+    "@types/better-sqlite3": "^9.6.0",
+    "@types/express": "^5.0.0",
+    "@types/node": "^24.0.0",
+    "@types/supertest": "^7.0.0",
+    "@vitest/coverage-v8": "^4.1.2",
+    "oxlint": "^1.58.0",
+    "oxlint-tsgolint": "^7.0.2001",
+    "prettier": "^3.4.2",
+    "source-map-support": "^0.5.21",
+    "supertest": "^7.0.0",
+    "typescript": "^6.0.2",
+    "vite": "^8.0.0",
+    "vitest": "^4.1.2"
+  }
+}
 </file>
 
 </files>

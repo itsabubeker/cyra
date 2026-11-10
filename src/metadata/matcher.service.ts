@@ -52,10 +52,11 @@ export class MatcherService {
           title: file.parsedTitle,
           year: file.parsedYear,
         };
-        const candidates = await this.tmdbClient.searchMovie(
-          parsed.title,
-          parsed.year,
-        );
+        const searchResult = await this.tmdbClient.searchMovie({
+          title: parsed.title,
+          year: parsed.year ?? undefined,
+        });
+        const candidates = searchResult.items;
 
         if (candidates.length <= 0) {
           const cause = `No match for "${file.parsedTitle}" (${file.parsedYear})`;
