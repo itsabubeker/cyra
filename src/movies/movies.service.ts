@@ -11,7 +11,7 @@ export class MoviesService {
     private readonly movies: Repository<Movie>,
   ) {}
 
-  findAll({ search, year, limit, page }: ListMoviesQueryDto) {
+  findAll({ search, year, size, page }: ListMoviesQueryDto) {
     const where: FindOptionsWhere<Movie> = {};
     if (search) where.title = Like(`%${search}%`);
     if (year) where.year = year;
@@ -19,8 +19,8 @@ export class MoviesService {
     return this.movies.findAndCount({
       order: { title: 'ASC', id: 'ASC' },
       where,
-      take: limit,
-      skip: limit * (page - 1),
+      take: size,
+      skip: size * (page - 1),
     });
   }
 

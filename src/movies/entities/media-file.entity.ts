@@ -6,6 +6,7 @@ import {
   type Relation,
 } from 'typeorm';
 import { Movie } from './movie.entity.js';
+import { ApiPropertyOptional } from '@nestjs/swagger';
 
 export enum MatchStatus {
   Unmatched = 'unmatched',
@@ -41,6 +42,7 @@ export class MediaFile {
   @Column({ type: 'real', nullable: true })
   matchScore!: number | null;
 
+  @ApiPropertyOptional({ type: () => Movie, nullable: true })
   @ManyToOne(() => Movie, (movie) => movie.files, {
     nullable: true,
     onDelete: 'SET NULL',

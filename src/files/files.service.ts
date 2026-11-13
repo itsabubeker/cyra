@@ -19,15 +19,15 @@ export class FilesService {
     private readonly movies: Repository<Movie>,
   ) {}
 
-  findAll({ status, limit, page }: ListFilesQueryDto) {
+  findAll({ status, size, page }: ListFilesQueryDto) {
     const where: FindOptionsWhere<MediaFile> = {};
     if (status) where.matchStatus = status;
 
     return this.files.findAndCount({
       order: { parsedTitle: 'ASC', id: 'ASC' },
       where,
-      take: limit,
-      skip: limit * (page - 1),
+      take: size,
+      skip: size * (page - 1),
     });
   }
 

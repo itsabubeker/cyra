@@ -116,7 +116,11 @@ export class ScannerService {
       `Scanned ${rows.length} video files in ${mediaDir}, removed ${removed} stale`,
     );
 
-    const items = await this.files.find({ order: { relativePath: 'ASC' } });
-    return { count: items.length, items };
+    const currentItemsCount = await this.files.count();
+    return {
+      scannedVideoItemsCount: rows.length,
+      currentItemsCount,
+      removedStaleCount: removed,
+    };
   }
 }

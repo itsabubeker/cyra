@@ -13,6 +13,10 @@ import {
   pickBest,
   scoreCandidate,
 } from './title-matcher.js';
+import {
+  FailedFileDto,
+  UnmatchedFileDto,
+} from './dto/metadata-response.dto.js';
 
 const SCORE_THRESHOLD = 0.8;
 
@@ -34,17 +38,8 @@ export class MatcherService {
     });
 
     let matched = 0;
-    const unmatched: {
-      title: string;
-      relativePath: string;
-      cause: string;
-      candidates?: Candidate[];
-    }[] = [];
-    const failed: {
-      title: string;
-      relativePath: string;
-      cause: string;
-    }[] = [];
+    const unmatched: UnmatchedFileDto[] = [];
+    const failed: FailedFileDto[] = [];
 
     for (const file of mediaFiles) {
       try {

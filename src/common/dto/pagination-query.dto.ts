@@ -13,5 +13,5 @@ export class PaginationQueryDto {
   @Min(1)
   @Max(100)
   @IsOptional()
-  limit: number = 20;
+  size: number = 20;
 }

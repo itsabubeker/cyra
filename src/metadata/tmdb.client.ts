@@ -1,51 +1,11 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { BadGatewayException, Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { SearchTmdbDto } from './dto/search-tmdb.dto.js';
-
-export interface TmdbMovie {
-  id: number;
-  title: string;
-  originalTitle: string;
-  year: number | null;
-  posterPath: string | null;
-}
-interface TmdbSearchResponse {
-  results: {
-    id: number;
-    title: string;
-    original_title: string;
-    release_date: string; // '' when unknown
-    poster_path: string | null;
-  }[];
-  page: number;
-  total_pages: number;
-  total_results: number;
-}
-
-export interface TmdbMovieDetails {
-  adult: boolean;
-  backdrop_path: string | null;
-  budget: number;
-  homepage: string | null;
-  id: number;
-  imdb_id: string | null;
-  origin_country: string[];
-  original_language: string;
-  original_title: string;
-  overview: string | null;
-  popularity: number;
-  poster_path: string | null;
-  release_date: string; // "" when unknown, not null
-  revenue: number;
-  runtime: number | null;
-  softcore: boolean;
-  status: string;
-  tagline: string | null;
-  title: string;
-  video: boolean;
-  vote_average: number;
-  vote_count: number;
-}
+import {
+  TmdbMovieDetails,
+  TmdbSearchResponse,
+} from './entities/tmdb.entity.js';
+import { TmdbMovieDto } from './dto/tmdb-movie.dto.js';
 
 @Injectable()
 export class TmdbClient {
@@ -55,7 +15,7 @@ export class TmdbClient {
     this.token = config.getOrThrow<string>('TMDB_API_KEY');
   }
   async searchMovie({ title, year, page }: SearchTmdbDto): Promise<{
-    items: TmdbMovie[];
+    items: TmdbMovieDto[];
     page: number;
     totalPages: number;
     totalResults: number;
@@ -70,7 +30,12 @@ export class TmdbClient {
         headers: { Authorization: `Bearer ${this.token}` },
       },
     );
-    if (!res.ok) throw new Error(`TMDB ${res.status}: ${await res.text()}`);
+    if (!res.ok) {
+      this.logger.error(
+        `TMDB search failed, ${res.status}: ${await res.text()}`,
+      );
+      throw new BadGatewayException(`TMDB ${res.status}: ${await res.text()}`);
+    }
 
     const data = (await res.json()) as TmdbSearchResponse;
 
@@ -88,12 +53,15 @@ export class TmdbClient {
     };
   }
 
-  async getMovie(id: number): Promise<TmdbMovie | null> {
+  async getMovie(id: number): Promise<TmdbMovieDto | null> {
     const res = await fetch(`https://api.themoviedb.org/3/movie/${id}`, {
       headers: { Authorization: `Bearer ${this.token}` },
     });
-    if (res.status == 404) return null;
-    if (!res.ok) throw new Error(`TMDB ${res.status}: ${await res.text()}`);
+    if (res.status === 404) return null;
+    if (!res.ok) {
+      this.logger.error(`TMDB failed, ${res.status}: ${await res.text()}`);
+      throw new BadGatewayException(`TMDB ${res.status}: ${await res.text()}`);
+    }
 
     const movie = (await res.json()) as TmdbMovieDetails;
 

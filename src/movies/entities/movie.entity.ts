@@ -6,6 +6,7 @@ import {
   type Relation,
 } from 'typeorm';
 import { MediaFile } from './media-file.entity.js';
+import { ApiProperty } from '@nestjs/swagger';
 
 @Entity()
 export class Movie {
@@ -24,6 +25,7 @@ export class Movie {
   @Column({ type: 'varchar', nullable: true })
   posterPath!: string | null;
 
+  @ApiProperty({ type: () => [MediaFile] })
   @OneToMany(() => MediaFile, (file) => file.movie)
   files!: Relation<MediaFile[]>;
 }
