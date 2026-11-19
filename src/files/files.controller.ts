@@ -12,7 +12,7 @@ import {
 import { ListFilesQueryDto } from './dto/list-files-query.dto.js';
 import { ManualMatchDto } from './dto/manual-match.dto.js';
 import { FilesService } from './files.service.js';
-import { StreamService } from './stream.service.js';
+import { MIME_TYPES, StreamService } from './stream.service.js';
 import type { Response } from 'express';
 import { MediaFile } from '../movies/entities/media-file.entity.js';
 import { PaginatedMediaFilesDto } from './dto/files-response.dto.js';
@@ -87,13 +87,15 @@ export class FilesController {
     description: 'Byte range, e.g. bytes=0-99',
   })
   @AllowQueryToken()
+  @ApiBearerAuth()
   @ApiQuery({
     name: 'token',
+    type: String,
     required: false,
     description:
       'JWT, for <video> tags that cannot send an Authorization header',
   })
-  @ApiProduces('video/mp4', 'video/x-matroska', 'video/webm', 'video/x-msvideo')
+  @ApiProduces(...new Set(Object.values(MIME_TYPES)))
   @ApiOkResponse({ description: 'Whole file (no Range header)' })
   @ApiResponse({
     status: 206,
