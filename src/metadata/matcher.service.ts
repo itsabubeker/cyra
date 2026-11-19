@@ -1,5 +1,4 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { TmdbClient } from './tmdb.client.js';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import {
@@ -8,15 +7,11 @@ import {
 } from '../movies/entities/media-file.entity.js';
 import { Movie } from '../movies/entities/movie.entity.js';
 import {
-  Candidate,
-  Parsed,
-  pickBest,
-  scoreCandidate,
-} from './title-matcher.js';
-import {
   FailedFileDto,
   UnmatchedFileDto,
 } from './dto/metadata-response.dto.js';
+import { Parsed, pickBest, scoreCandidate } from './title-matcher.js';
+import { TmdbClient } from './tmdb.client.js';
 
 const SCORE_THRESHOLD = 0.8;
 

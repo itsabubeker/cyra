@@ -14,6 +14,7 @@ describe('ScannerService', () => {
     find: ReturnType<typeof vi.fn>;
     delete: ReturnType<typeof vi.fn>;
     upsert: ReturnType<typeof vi.fn>;
+    count: ReturnType<typeof vi.fn>;
   };
 
   beforeEach(async () => {
@@ -23,6 +24,7 @@ describe('ScannerService', () => {
       find: vi.fn().mockResolvedValue([]),
       delete: vi.fn(),
       upsert: vi.fn(),
+      count: vi.fn(),
     };
 
     const module: TestingModule = await Test.createTestingModule({

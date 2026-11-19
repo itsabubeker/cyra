@@ -12,6 +12,7 @@ async function bootstrap() {
     .setTitle('Cyra')
     .setDescription('Crya Api docs')
     .setVersion('1.0')
+    .addBearerAuth()
     .build();
 
   const documentFactory = () => SwaggerModule.createDocument(app, config);

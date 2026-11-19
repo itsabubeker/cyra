@@ -31,10 +31,11 @@ export class TmdbClient {
       },
     );
     if (!res.ok) {
+      const responseMessage = await res.text();
       this.logger.error(
-        `TMDB search failed, ${res.status}: ${await res.text()}`,
+        `TMDB search failed, ${res.status}: ${responseMessage}`,
       );
-      throw new BadGatewayException(`TMDB ${res.status}: ${await res.text()}`);
+      throw new BadGatewayException(`TMDB ${res.status}: ${responseMessage}`);
     }
 
     const data = (await res.json()) as TmdbSearchResponse;
@@ -59,8 +60,9 @@ export class TmdbClient {
     });
     if (res.status === 404) return null;
     if (!res.ok) {
-      this.logger.error(`TMDB failed, ${res.status}: ${await res.text()}`);
-      throw new BadGatewayException(`TMDB ${res.status}: ${await res.text()}`);
+      const responseMessage = await res.text();
+      this.logger.error(`TMDB failed, ${res.status}: ${responseMessage}`);
+      throw new BadGatewayException(`TMDB ${res.status}: ${responseMessage}`);
     }
 
     const movie = (await res.json()) as TmdbMovieDetails;

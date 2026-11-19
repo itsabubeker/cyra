@@ -7,6 +7,8 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import { MoviesModule } from './movies/movies.module.js';
 import { MetaDataModule } from './metadata/metadata.module.js';
 import { FilesModule } from './files/files.module.js';
+import { AuthModule } from './auth/auth.module.js';
+import { UsersModule } from './users/users.module.js';
 
 @Module({
   imports: [
@@ -24,6 +26,8 @@ import { FilesModule } from './files/files.module.js';
     MoviesModule,
     MetaDataModule,
     FilesModule,
+    AuthModule,
+    UsersModule,
   ],
   controllers: [AppController],
   providers: [AppService],
