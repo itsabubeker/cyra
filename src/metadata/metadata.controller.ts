@@ -4,6 +4,7 @@ import {
   ApiBearerAuth,
   ApiConflictResponse,
   ApiOperation,
+  ApiTags,
 } from '@nestjs/swagger';
 import { Roles } from '../auth/decorators/roles.decorator.js';
 import { ErrorResponseDto } from '../common/dto/error-response.dto.js';
@@ -17,6 +18,7 @@ import { TmdbClient } from './tmdb.client.js';
 
 @Controller('matcher')
 @Roles(Role.Admin)
+@ApiTags('matcher')
 export class MetaDataController {
   constructor(
     private readonly matcherService: MatcherService,

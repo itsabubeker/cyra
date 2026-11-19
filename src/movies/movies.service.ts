@@ -38,6 +38,7 @@ export class MoviesService {
     const movieIds = movies.map((item) => item.id);
     const watchRecords = await this.watchRecords.find({
       where: { userId, movieId: In(movieIds) },
+      select: { movieId: true },
     });
 
     const recordSet = new Set(watchRecords.map((r) => r.movieId));
@@ -62,9 +63,9 @@ export class MoviesService {
       where: { id: movieId },
       relations: { files: true },
     });
-    if (!movie)
+    if (!movie) {
       throw new NotFoundException(`Movie with ID ${movieId} not found`);
-
+    }
     const watched = await this.watchRecords.existsBy({
       userId: userId,
       movieId,

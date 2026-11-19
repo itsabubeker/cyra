@@ -1,15 +1,14 @@
 import { Module } from '@nestjs/common';
-import { AppController } from './app.controller.js';
-import { AppService } from './app.service.js';
-import { ScannerModule } from './scanner/scanner.module.js';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { TypeOrmModule } from '@nestjs/typeorm';
-import { MoviesModule } from './movies/movies.module.js';
-import { MetaDataModule } from './metadata/metadata.module.js';
-import { FilesModule } from './files/files.module.js';
+import { AppController } from './app.controller.js';
 import { AuthModule } from './auth/auth.module.js';
-import { UsersModule } from './users/users.module.js';
+import { FilesModule } from './files/files.module.js';
 import { JobsModule } from './jobs/jobs.module.js';
+import { MetaDataModule } from './metadata/metadata.module.js';
+import { MoviesModule } from './movies/movies.module.js';
+import { ScannerModule } from './scanner/scanner.module.js';
+import { UsersModule } from './users/users.module.js';
 
 @Module({
   imports: [
@@ -32,6 +31,5 @@ import { JobsModule } from './jobs/jobs.module.js';
     JobsModule,
   ],
   controllers: [AppController],
-  providers: [AppService],
 })
 export class AppModule {}

@@ -10,7 +10,7 @@ import { Public } from './decorators/public.decorator.js';
 import { ChangePasswordDto } from './dto/change-password.dto.js';
 import { CurrentUser } from '../common/decorators/current-user.decorator.js';
 import { User } from '../users/entities/user.entity.js';
-import { ApiBearerAuth } from '@nestjs/swagger';
+import { ApiBearerAuth, ApiOperation } from '@nestjs/swagger';
 import { UserResponseDto } from '../users/dto/users-response.dto.js';
 
 @Controller('auth')
@@ -49,6 +49,11 @@ export class AuthController {
   @Patch('change-password')
   @ApiBearerAuth()
   @HttpCode(204)
+  @ApiOperation({
+    summary: 'Change own password',
+    description:
+      'Revokes every token for this user, including the one used for this request. The client must sign in again.',
+  })
   async changePassword(
     @Body() body: ChangePasswordDto,
     @CurrentUser() user: User,
