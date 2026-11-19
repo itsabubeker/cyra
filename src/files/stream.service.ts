@@ -10,7 +10,7 @@ import { stat } from 'node:fs/promises';
 import path from 'node:path';
 import { parseRange } from './parse-range.js';
 
-const MIME_TYPES: Record<string, string> = {
+export const MIME_TYPES: Record<string, string> = {
   '.mp4': 'video/mp4',
   '.mkv': 'video/x-matroska',
   '.avi': 'video/x-msvideo',
