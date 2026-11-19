@@ -27,12 +27,16 @@ export class MatcherService {
     private readonly movies: Repository<Movie>,
   ) {}
 
-  async matchAll() {
+  async matchAll(onProgress?: (done: number, total: number) => void) {
     const mediaFiles = await this.files.find({
       where: { matchStatus: MatchStatus.Unmatched },
     });
+    if (onProgress) {
+      onProgress(0, mediaFiles.length);
+    }
 
     let matched = 0;
+    let processed = 0;
     const unmatched: UnmatchedFileDto[] = [];
     const failed: FailedFileDto[] = [];
 
@@ -110,6 +114,11 @@ export class MatcherService {
             relativePath: file.relativePath,
             cause: 'Unknown error occured',
           });
+        }
+      } finally {
+        processed += 1;
+        if (onProgress) {
+          onProgress(processed, mediaFiles.length);
         }
       }
     }

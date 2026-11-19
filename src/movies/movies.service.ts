@@ -50,7 +50,6 @@ export class MoviesService {
           title: movie.title,
           year: movie.year,
           posterPath: movie.posterPath,
-          files: movie.files,
           watched: recordSet.has(movie.id),
         };
       }),

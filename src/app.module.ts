@@ -9,6 +9,7 @@ import { MetaDataModule } from './metadata/metadata.module.js';
 import { FilesModule } from './files/files.module.js';
 import { AuthModule } from './auth/auth.module.js';
 import { UsersModule } from './users/users.module.js';
+import { JobsModule } from './jobs/jobs.module.js';
 
 @Module({
   imports: [
@@ -28,6 +29,7 @@ import { UsersModule } from './users/users.module.js';
     FilesModule,
     AuthModule,
     UsersModule,
+    JobsModule,
   ],
   controllers: [AppController],
   providers: [AppService],

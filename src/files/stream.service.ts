@@ -15,6 +15,13 @@ const MIME_TYPES: Record<string, string> = {
   '.mkv': 'video/x-matroska',
   '.avi': 'video/x-msvideo',
   '.webm': 'video/webm',
+  '.m4v': 'video/mp4',
+  '.mov': 'video/quicktime',
+  '.wmv': 'video/x-ms-wmv',
+  '.ts': 'video/mp2t',
+  '.flv': 'video/x-flv',
+  '.mpg': 'video/mpeg',
+  '.mpeg': 'video/mpeg',
 };
 
 @Injectable()

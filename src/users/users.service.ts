@@ -2,14 +2,13 @@ import {
   ConflictException,
   ForbiddenException,
   Injectable,
-  MethodNotAllowedException,
   NotFoundException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { FindOptionsWhere, Like, Repository } from 'typeorm';
+import { ListUsersDto } from './dto/list-users.dto.js';
 import { Role, User } from './entities/user.entity.js';
 import { hashPassword } from './password.js';
-import { ListUsersDto } from './dto/list-users.dto.js';
 
 const normalizeUsername = (username: string) => username.toLowerCase().trim();
 
