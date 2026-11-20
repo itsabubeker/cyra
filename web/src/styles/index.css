@@ -1,0 +1,139 @@
+@import 'tailwindcss';
+@import 'tw-animate-css';
+@import '@fontsource-variable/geist';
+@import '@fontsource-variable/geist-mono';
+@import '@fontsource/instrument-serif/400.css';
+@import '@fontsource/instrument-serif/400-italic.css';
+
+@custom-variant dark (&:is(.dark *));
+
+:root {
+  color-scheme: dark;
+  --radius: 0.625rem;
+  --nav-height: 4.25rem;
+
+  --background: #0a0a0b;
+  --foreground: #efeae2;
+  --card: #131315;
+  --card-foreground: #efeae2;
+  --popover: #131315;
+  --popover-foreground: #efeae2;
+  --primary: #efeae2;
+  --primary-foreground: #0a0a0b;
+  --secondary: #1c1c1f;
+  --secondary-foreground: #efeae2;
+  --muted: #1c1c1f;
+  --muted-foreground: #9a948a;
+  --accent: #1c1c1f;
+  --accent-foreground: #efeae2;
+  --destructive: #ffb08a;
+  --border: #232326;
+  --input: #2a2a2e;
+  --ring: #ffd27a;
+
+  --sunken: #0e0e10;
+  --soft: #d8d2c8;
+  --body: #a8a299;
+  --subtle: #6b665f;
+  --amber: #ffd27a;
+  --amber-surface: #17160f;
+  --amber-border: #5a4c26;
+  --success: #a9d8a0;
+  --info: #9fc3ff;
+  --danger: #ffb08a;
+}
+
+@keyframes indeterminate {
+  0% {
+    transform: translateX(-100%);
+  }
+  100% {
+    transform: translateX(300%);
+  }
+}
+
+@theme inline {
+  --font-sans: 'Geist Variable', ui-sans-serif, system-ui, sans-serif;
+  --font-mono: 'Geist Mono Variable', ui-monospace, monospace;
+  --font-serif: 'Instrument Serif', Georgia, serif;
+
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+
+  --color-sunken: var(--sunken);
+  --color-soft: var(--soft);
+  --color-body: var(--body);
+  --color-subtle: var(--subtle);
+  --color-amber: var(--amber);
+  --color-amber-surface: var(--amber-surface);
+  --color-amber-border: var(--amber-border);
+  --color-success: var(--success);
+  --color-info: var(--info);
+  --color-danger: var(--danger);
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+
+  html {
+    @apply bg-background;
+  }
+
+  body {
+    @apply min-h-dvh bg-background font-sans text-foreground antialiased;
+  }
+
+  ::selection {
+    @apply bg-amber text-background;
+  }
+
+  @media (width >= 48rem) {
+    :root {
+      --nav-height: 5rem;
+    }
+  }
+}
+
+@utility eyebrow {
+  @apply font-mono text-[11px] font-medium tracking-[0.12em] text-muted-foreground uppercase;
+}
+
+@utility display {
+  @apply font-serif font-normal italic leading-[0.9] tracking-tight;
+  overflow-wrap: anywhere;
+}
+
+@utility film-strip {
+  background-color: var(--background);
+  background-image: repeating-linear-gradient(90deg, transparent 0 14px, #1c1c1f 14px 26px);
+  background-size: 26px 10px;
+  background-repeat: repeat-x;
+  background-position: 0 6px;
+}
+
+@utility poster-placeholder {
+  background: repeating-linear-gradient(45deg, #151517 0 8px, #1a1a1d 8px 16px);
+}

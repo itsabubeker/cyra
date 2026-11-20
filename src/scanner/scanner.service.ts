@@ -105,9 +105,18 @@ export class ScannerService {
       };
     });
 
+    // Query builder with updateEntity(false) instead of repository.upsert():
+    // SQLite has no RETURNING support in TypeORM, so upsert tries to re-read
+    // generated ids and throws once rows already exist (every scan after the first).
     for (let i = 0; i < rows.length; i += 200) {
-      const batch = rows.slice(i, i + 200).map((r) => ({ ...r }));
-      await this.files.upsert(batch, ['relativePath']);
+      await this.files
+        .createQueryBuilder()
+        .insert()
+        .into(MediaFile)
+        .values(rows.slice(i, i + 200))
+        .orUpdate(['parsedTitle', 'parsedYear', 'sizeBytes'], ['relativePath'])
+        .updateEntity(false)
+        .execute();
     }
 
     const removed = await this.removeStale(rows);

@@ -3,98 +3,160 @@ import os from 'node:os';
 import path from 'node:path';
 import { Test, TestingModule } from '@nestjs/testing';
 import { ConfigService } from '@nestjs/config';
-import { getRepositoryToken } from '@nestjs/typeorm';
+import { getRepositoryToken, TypeOrmModule } from '@nestjs/typeorm';
+import { Repository } from 'typeorm';
 import { ScannerService } from './scanner.service.js';
-import { MediaFile } from '../movies/entities/media-file.entity.js';
+import {
+  MatchStatus,
+  MediaFile,
+} from '../movies/entities/media-file.entity.js';
+import { Movie } from '../movies/entities/movie.entity.js';
+import { WatchRecord } from '../movies/entities/watch-record.entity.js';
+import { User } from '../users/entities/user.entity.js';
 
+// Runs against a real SQLite database: the upsert behaviour under test
+// depends on the driver, which a mocked repository can't reproduce.
 describe('ScannerService', () => {
+  let module: TestingModule;
   let service: ScannerService;
-  let tempDir: string;
-  let files: {
-    find: ReturnType<typeof vi.fn>;
-    delete: ReturnType<typeof vi.fn>;
-    upsert: ReturnType<typeof vi.fn>;
-    count: ReturnType<typeof vi.fn>;
-  };
+  let files: Repository<MediaFile>;
+  let mediaDir: string;
+  let dbDir: string;
 
-  beforeEach(async () => {
-    tempDir = await mkdtemp(path.join(os.tmpdir(), 'scanner-test-'));
-
-    files = {
-      find: vi.fn().mockResolvedValue([]),
-      delete: vi.fn(),
-      upsert: vi.fn(),
-      count: vi.fn(),
-    };
-
-    const module: TestingModule = await Test.createTestingModule({
+  /** Boots a fresh app connection, like a server start, on the same database file. */
+  async function start() {
+    await module?.close();
+    module = await Test.createTestingModule({
+      imports: [
+        TypeOrmModule.forRoot({
+          type: 'better-sqlite3',
+          database: path.join(dbDir, 'test.db'),
+          entities: [MediaFile, Movie, WatchRecord, User],
+          synchronize: true,
+        }),
+        TypeOrmModule.forFeature([MediaFile]),
+      ],
       providers: [
         ScannerService,
         {
           provide: ConfigService,
-          useValue: { getOrThrow: vi.fn().mockReturnValue(tempDir) },
+          useValue: { getOrThrow: vi.fn().mockReturnValue(mediaDir) },
         },
-        { provide: getRepositoryToken(MediaFile), useValue: files },
       ],
     }).compile();
 
-    service = module.get<ScannerService>(ScannerService);
+    service = module.get(ScannerService);
+    files = module.get(getRepositoryToken(MediaFile));
+  }
+
+  beforeEach(async () => {
+    mediaDir = await mkdtemp(path.join(os.tmpdir(), 'scanner-media-'));
+    dbDir = await mkdtemp(path.join(os.tmpdir(), 'scanner-db-'));
+    await start();
   });
 
   afterEach(async () => {
-    await rm(tempDir, { recursive: true, force: true });
+    await module.close();
+    await rm(mediaDir, { recursive: true, force: true });
+    await rm(dbDir, { recursive: true, force: true });
   });
 
-  it('should be defined', () => {
-    expect(service).toBeDefined();
-  });
-
-  it('upserts a row for each video file', async () => {
-    await writeFile(path.join(tempDir, 'Heat (1995).mkv'), '');
+  it('adds a row for each video file', async () => {
+    await writeFile(path.join(mediaDir, 'Heat (1995).mkv'), '');
 
     await service.scan();
 
-    expect(files.upsert).toHaveBeenCalledWith(
-      [
-        expect.objectContaining({
-          relativePath: 'Heat (1995).mkv',
-          parsedTitle: 'Heat',
-          parsedYear: 1995,
-        }),
-      ],
-      ['relativePath'],
-    );
+    expect(await files.find()).toEqual([
+      expect.objectContaining({
+        relativePath: 'Heat (1995).mkv',
+        parsedTitle: 'Heat',
+        parsedYear: 1995,
+        matchStatus: MatchStatus.Unmatched,
+      }),
+    ]);
   });
+
+  it('can scan again after a restart when every file is already in the library', async () => {
+    await writeFile(path.join(mediaDir, 'Heat (1995).mkv'), '');
+    await writeFile(path.join(mediaDir, 'Alien (1979).mp4'), '');
+    await service.scan();
+    await writeFile(path.join(mediaDir, 'Heat (1995).mkv'), 'grown');
+    await start();
+
+    const result = await service.scan();
+
+    expect(result).toEqual({
+      scannedVideoItemsCount: 2,
+      currentItemsCount: 2,
+      removedStaleCount: 0,
+    });
+    const heat = await files.findOneByOrFail({
+      relativePath: 'Heat (1995).mkv',
+    });
+    expect(heat.sizeBytes).toBe(5);
+  });
+
+  it('adds new files on a later scan', async () => {
+    await writeFile(path.join(mediaDir, 'Heat (1995).mkv'), '');
+    await service.scan();
+    await writeFile(path.join(mediaDir, 'Alien (1979).mp4'), '');
+
+    const result = await service.scan();
+
+    expect(result.currentItemsCount).toBe(2);
+  });
+
+  it('keeps match data when a known file is scanned again', async () => {
+    await writeFile(path.join(mediaDir, 'Heat (1995).mkv'), '');
+    await service.scan();
+    const heat = await files.findOneByOrFail({
+      relativePath: 'Heat (1995).mkv',
+    });
+    await files.update(heat.id, {
+      matchStatus: MatchStatus.Manual,
+      matchScore: null,
+    });
+
+    await service.scan();
+
+    const rescanned = await files.findOneByOrFail({ id: heat.id });
+    expect(rescanned.matchStatus).toBe(MatchStatus.Manual);
+  });
+
   it('ignores video files inside extras folders', async () => {
-    await writeFile(path.join(tempDir, 'Heat (1995).mkv'), '');
-    await mkdir(path.join(tempDir, 'Extras'));
-    await writeFile(path.join(tempDir, 'Extras', 'Making Of (1995).mkv'), '');
+    await writeFile(path.join(mediaDir, 'Heat (1995).mkv'), '');
+    await mkdir(path.join(mediaDir, 'Extras'));
+    await writeFile(path.join(mediaDir, 'Extras', 'Making Of (1995).mkv'), '');
 
     await service.scan();
 
-    expect(files.upsert).toHaveBeenCalledWith(
-      [expect.objectContaining({ relativePath: 'Heat (1995).mkv' })],
-      ['relativePath'],
-    );
+    const paths = (await files.find()).map((file) => file.relativePath);
+    expect(paths).toEqual(['Heat (1995).mkv']);
   });
 
   it('deletes rows whose file no longer exists', async () => {
-    await writeFile(path.join(tempDir, 'Heat (1995).mkv'), '');
-    files.find.mockResolvedValue([
-      { id: 1, relativePath: 'Heat (1995).mkv' },
-      { id: 7, relativePath: 'Gone (2000).mkv' },
-    ]);
-
+    await writeFile(path.join(mediaDir, 'Heat (1995).mkv'), '');
+    await writeFile(path.join(mediaDir, 'Gone (2000).mkv'), '');
     await service.scan();
+    await rm(path.join(mediaDir, 'Gone (2000).mkv'));
 
-    expect(files.delete).toHaveBeenCalledWith([7]);
+    const result = await service.scan();
+
+    expect(result.removedStaleCount).toBe(1);
+    const paths = (await files.find()).map((file) => file.relativePath);
+    expect(paths).toEqual(['Heat (1995).mkv']);
   });
 
   it('never deletes anything when the scan finds no files', async () => {
-    files.find.mockResolvedValue([{ id: 7, relativePath: 'Gone (2000).mkv' }]);
+    await files.save({
+      relativePath: 'Gone (2000).mkv',
+      parsedTitle: 'Gone',
+      parsedYear: 2000,
+      sizeBytes: 0,
+    });
 
     await service.scan();
 
-    expect(files.delete).not.toHaveBeenCalled();
+    expect(await files.count()).toBe(1);
   });
 });

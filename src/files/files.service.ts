@@ -52,16 +52,29 @@ export class FilesService {
     if (!tmdbMovie)
       throw new NotFoundException(`Tmdb movie with ID ${tmdbId} not found `);
 
-    let movie = await this.movies.findOneBy({ tmdbId });
-    if (!movie) {
-      const { id, originalTitle: _, ...fields } = tmdbMovie;
-      movie = await this.movies.save({ tmdbId: id, ...fields });
-    }
+    const previousMovieId = file.movie?.id;
 
-    file.movie = movie;
-    file.matchStatus = MatchStatus.Manual;
-    file.matchScore = null;
+    return this.files.manager.transaction(async (manager) => {
+      let movie = await manager.findOneBy(Movie, { tmdbId });
+      if (!movie) {
+        const { id, originalTitle: _, ...fields } = tmdbMovie;
+        movie = await manager.save(Movie, { tmdbId: id, ...fields });
+      }
 
-    return await this.files.save(file);
+      file.movie = movie;
+      file.matchStatus = MatchStatus.Manual;
+      file.matchScore = null;
+      const saved = await manager.save(file);
+
+      // A wrong match leaves the old movie behind; drop it once no file points at it.
+      if (previousMovieId !== undefined && previousMovieId !== movie.id) {
+        const remaining = await manager.countBy(MediaFile, {
+          movie: { id: previousMovieId },
+        });
+        if (remaining === 0) await manager.delete(Movie, previousMovieId);
+      }
+
+      return saved;
+    });
   }
 }
