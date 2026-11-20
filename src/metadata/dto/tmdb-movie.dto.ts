@@ -9,3 +9,13 @@ export class TmdbMovieDto {
   @ApiProperty({ type: String, nullable: true })
   posterPath: string | null;
 }
+
+export interface TmdbMovieDetailsDto extends TmdbMovieDto {
+  overview: string | null;
+  tagline: string | null;
+  runtime: number | null;
+  backdropPath: string | null;
+  voteAverage: number;
+  voteCount: number;
+  imdbId: string | null;
+}

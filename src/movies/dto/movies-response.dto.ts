@@ -28,6 +28,20 @@ export class PaginatedMoviesDto extends PaginatedResponseDto {
 }
 
 export class MovieDetailDto extends MovieListItemDto {
+  overview!: string | null;
+
+  tagline!: string | null;
+
+  runtime!: number | null;
+
+  backdropPath!: string | null;
+
+  voteAverage!: number | null;
+
+  voteCount!: number | null;
+
+  imdbId!: string | null;
+
   @ApiProperty({ type: () => [MediaFile] })
   files!: MediaFile[];
 }

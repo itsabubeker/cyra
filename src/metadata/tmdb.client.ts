@@ -5,7 +5,7 @@ import {
   TmdbMovieDetails,
   TmdbSearchResponse,
 } from './entities/tmdb.entity.js';
-import { TmdbMovieDto } from './dto/tmdb-movie.dto.js';
+import { TmdbMovieDetailsDto, TmdbMovieDto } from './dto/tmdb-movie.dto.js';
 
 @Injectable()
 export class TmdbClient {
@@ -54,7 +54,7 @@ export class TmdbClient {
     };
   }
 
-  async getMovie(id: number): Promise<TmdbMovieDto | null> {
+  async getMovie(id: number): Promise<TmdbMovieDetailsDto | null> {
     const res = await fetch(`https://api.themoviedb.org/3/movie/${id}`, {
       headers: { Authorization: `Bearer ${this.token}` },
     });
@@ -73,6 +73,13 @@ export class TmdbClient {
       originalTitle: movie.original_title,
       year: movie.release_date ? Number(movie.release_date.slice(0, 4)) : null,
       posterPath: movie.poster_path,
+      overview: movie.overview || null,
+      tagline: movie.tagline || null,
+      runtime: movie.runtime || null,
+      backdropPath: movie.backdrop_path,
+      voteAverage: movie.vote_average,
+      voteCount: movie.vote_count,
+      imdbId: movie.imdb_id || null,
     };
   }
 }

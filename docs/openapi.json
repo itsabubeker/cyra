@@ -1087,6 +1087,34 @@
           "posterPath": {
             "type": "string",
             "nullable": true
+          },
+          "overview": {
+            "type": "string",
+            "nullable": true
+          },
+          "tagline": {
+            "type": "string",
+            "nullable": true
+          },
+          "runtime": {
+            "type": "number",
+            "nullable": true
+          },
+          "backdropPath": {
+            "type": "string",
+            "nullable": true
+          },
+          "voteAverage": {
+            "type": "number",
+            "nullable": true
+          },
+          "voteCount": {
+            "type": "number",
+            "nullable": true
+          },
+          "imdbId": {
+            "type": "string",
+            "nullable": true
           }
         },
         "required": [
@@ -1095,7 +1123,14 @@
           "tmdbId",
           "title",
           "year",
-          "posterPath"
+          "posterPath",
+          "overview",
+          "tagline",
+          "runtime",
+          "backdropPath",
+          "voteAverage",
+          "voteCount",
+          "imdbId"
         ]
       },
       "MediaFile": {
@@ -1167,6 +1202,34 @@
               "$ref": "#/components/schemas/MediaFile"
             }
           },
+          "overview": {
+            "type": "string",
+            "nullable": true
+          },
+          "tagline": {
+            "type": "string",
+            "nullable": true
+          },
+          "runtime": {
+            "type": "number",
+            "nullable": true
+          },
+          "backdropPath": {
+            "type": "string",
+            "nullable": true
+          },
+          "voteAverage": {
+            "type": "number",
+            "nullable": true
+          },
+          "voteCount": {
+            "type": "number",
+            "nullable": true
+          },
+          "imdbId": {
+            "type": "string",
+            "nullable": true
+          },
           "id": {
             "type": "number"
           },
@@ -1184,6 +1247,13 @@
           "year",
           "posterPath",
           "files",
+          "overview",
+          "tagline",
+          "runtime",
+          "backdropPath",
+          "voteAverage",
+          "voteCount",
+          "imdbId",
           "id",
           "tmdbId",
           "title",

@@ -84,12 +84,11 @@ export class MatcherService {
 
         let movie = await this.movies.findOneBy({ tmdbId: best.candidate.id });
         if (!movie) {
-          movie = await this.movies.save({
-            tmdbId: best.candidate.id,
-            title: best.candidate.title,
-            year: best.candidate.year,
-            posterPath: best.candidate.posterPath,
-          });
+          const details = await this.tmdbClient.getMovie(best.candidate.id);
+          if (!details)
+            throw new Error(`TMDB movie ${best.candidate.id} not found`);
+          const { id, originalTitle: _, ...fields } = details;
+          movie = await this.movies.save({ tmdbId: id, ...fields });
         }
 
         file.movie = movie;

@@ -54,12 +54,8 @@ export class FilesService {
 
     let movie = await this.movies.findOneBy({ tmdbId });
     if (!movie) {
-      movie = await this.movies.save({
-        tmdbId: tmdbMovie.id,
-        title: tmdbMovie.title,
-        year: tmdbMovie.year,
-        posterPath: tmdbMovie.posterPath,
-      });
+      const { id, originalTitle: _, ...fields } = tmdbMovie;
+      movie = await this.movies.save({ tmdbId: id, ...fields });
     }
 
     file.movie = movie;

@@ -25,6 +25,27 @@ export class Movie {
   @Column({ type: 'varchar', nullable: true })
   posterPath!: string | null;
 
+  @Column({ type: 'text', nullable: true })
+  overview!: string | null;
+
+  @Column({ type: 'varchar', nullable: true })
+  tagline!: string | null;
+
+  @Column({ type: 'integer', nullable: true })
+  runtime!: number | null;
+
+  @Column({ type: 'varchar', nullable: true })
+  backdropPath!: string | null;
+
+  @Column({ type: 'real', nullable: true })
+  voteAverage!: number | null;
+
+  @Column({ type: 'integer', nullable: true })
+  voteCount!: number | null;
+
+  @Column({ type: 'varchar', nullable: true })
+  imdbId!: string | null;
+
   @ApiProperty({ type: () => [MediaFile] })
   @OneToMany(() => MediaFile, (file) => file.movie)
   files!: Relation<MediaFile[]>;

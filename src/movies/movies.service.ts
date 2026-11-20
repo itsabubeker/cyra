@@ -79,6 +79,13 @@ export class MoviesService {
       posterPath: movie.posterPath,
       files: movie.files,
       watched,
+      overview: movie.overview,
+      tagline: movie.tagline,
+      runtime: movie.runtime,
+      backdropPath: movie.backdropPath,
+      voteAverage: movie.voteAverage,
+      voteCount: movie.voteCount,
+      imdbId: movie.imdbId,
     };
   }
 
