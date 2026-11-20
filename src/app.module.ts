@@ -1,5 +1,7 @@
+import { join } from 'node:path';
 import { Module } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
+import { ServeStaticModule } from '@nestjs/serve-static';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { AppController } from './app.controller.js';
 import { AuthModule } from './auth/auth.module.js';
@@ -29,6 +31,13 @@ import { UsersModule } from './users/users.module.js';
     AuthModule,
     UsersModule,
     JobsModule,
+    // Serves the built React client (web/dist). Everything outside /api and
+    // /docs falls back to index.html so client-side routes survive a refresh.
+    // The path resolves the same from src/ (tests) and dist/ (nest build).
+    ServeStaticModule.forRoot({
+      rootPath: join(import.meta.dirname, '..', 'web', 'dist'),
+      exclude: ['/api/{*path}', '/docs/{*path}'],
+    }),
   ],
   controllers: [AppController],
 })
