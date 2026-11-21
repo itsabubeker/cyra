@@ -1,8 +1,9 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Movie } from './entities/movie.entity.js';
-import { FindOptionsWhere, In, Like, Repository } from 'typeorm';
+import { In, Repository } from 'typeorm';
 import { ListMoviesQueryDto } from './dto/list-movies-query.dto.js';
+import { MediaFile } from './entities/media-file.entity.js';
 import { WatchRecord } from './entities/watch-record.entity.js';
 
 @Injectable()
@@ -21,19 +22,28 @@ export class MoviesService {
     query: ListMoviesQueryDto;
     userId: number;
   }) {
-    const where: FindOptionsWhere<Movie> = {};
-    if (search) where.title = Like(`%${search}%`);
-    if (year) where.year = year;
+    const listQuery = this.movies
+      .createQueryBuilder('movie')
+      .where(
+        (qb) =>
+          'EXISTS ' +
+          qb
+            .subQuery()
+            .select('1')
+            .from(MediaFile, 'file')
+            .where('file.movieId = movie.id')
+            .getQuery(),
+      )
+      .orderBy('movie.title', 'ASC')
+      .addOrderBy('movie.id', 'ASC')
+      .take(size)
+      .skip(size * (page - 1));
+    if (search)
+      listQuery.andWhere('movie.title LIKE :search', { search: `%${search}%` });
+    if (year) listQuery.andWhere('movie.year = :year', { year });
 
-    const result = await this.movies.findAndCount({
-      order: { title: 'ASC', id: 'ASC' },
-      where,
-      take: size,
-      skip: size * (page - 1),
-    });
-
-    const movies = result[0];
-    if (movies.length === 0) return { items: [], total: result[1] };
+    const [movies, total] = await listQuery.getManyAndCount();
+    if (movies.length === 0) return { items: [], total };
 
     const movieIds = movies.map((item) => item.id);
     const watchRecords = await this.watchRecords.find({
@@ -54,7 +64,7 @@ export class MoviesService {
           watched: recordSet.has(movie.id),
         };
       }),
-      total: result[1],
+      total,
     };
   }
 
@@ -63,7 +73,8 @@ export class MoviesService {
       where: { id: movieId },
       relations: { files: true },
     });
-    if (!movie) {
+    // A movie with no files left is hidden from the list, so hide it here too.
+    if (!movie || movie.files.length === 0) {
       throw new NotFoundException(`Movie with ID ${movieId} not found`);
     }
     const watched = await this.watchRecords.existsBy({

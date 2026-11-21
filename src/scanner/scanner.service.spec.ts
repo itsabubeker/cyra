@@ -147,6 +147,25 @@ describe('ScannerService', () => {
     expect(paths).toEqual(['Heat (1995).mkv']);
   });
 
+  it('keeps the movie when its last file is removed, so a replacement file matches back to it', async () => {
+    await writeFile(path.join(mediaDir, 'Heat (1995).mkv'), '');
+    await writeFile(path.join(mediaDir, 'Alien (1979).mp4'), '');
+    await service.scan();
+    const movie = await files.manager.save(Movie, {
+      tmdbId: 949,
+      title: 'Heat',
+      year: 1995,
+      posterPath: null,
+    });
+    await files.update({ relativePath: 'Heat (1995).mkv' }, { movie });
+    await rm(path.join(mediaDir, 'Heat (1995).mkv'));
+
+    await service.scan();
+
+    expect(await files.countBy({ movie: { id: movie.id } })).toBe(0);
+    expect(await files.manager.existsBy(Movie, { id: movie.id })).toBe(true);
+  });
+
   it('never deletes anything when the scan finds no files', async () => {
     await files.save({
       relativePath: 'Gone (2000).mkv',
