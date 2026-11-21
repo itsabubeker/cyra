@@ -1,0 +1,18 @@
+name: cyra
+
+services:
+  cyra:
+    build: .
+    image: cyra
+    ports:
+      - '${CYRA_PORT:-3000}:3000'
+    volumes:
+      - ${MEDIA_PATH:?set MEDIA_PATH in .env}:/media:ro
+      - cyra-data:/data
+    environment:
+      TMDB_API_KEY: ${TMDB_API_KEY:?set TMDB_API_KEY in .env}
+      JWT_SECRET: ${JWT_SECRET:?set JWT_SECRET in .env}
+    restart: unless-stopped
+
+volumes:
+  cyra-data:

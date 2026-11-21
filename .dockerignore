@@ -1,0 +1,32 @@
+# Dependencies: installed fresh inside the image with `npm ci`.
+# The ones on your machine contain native binaries built for your OS
+# (better-sqlite3), which would crash on Linux.
+**/node_modules
+
+# Build output: the image builds its own.
+dist
+web/dist
+*.tsbuildinfo
+
+# Secrets and local data: never bake these into an image.
+.env
+.env.*
+data
+
+# Not needed to build or run the app.
+.git
+.gitattributes
+.vscode
+.idea
+coverage
+**/*.log
+test
+**/*.spec.ts
+vitest.config*.ts
+docs
+*.md
+
+# Docker files themselves don't affect the image.
+Dockerfile
+.dockerignore
+compose.yaml
