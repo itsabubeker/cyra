@@ -15,7 +15,7 @@ export function NotFound({
   className,
 }: NotFoundProps) {
   return (
-    <EmptyState eyebrow="404" title={title} description={description} className={className}>
+    <EmptyState eyebrow="404" title={title} description={description} backdrop className={className}>
       <Button asChild>
         <Link to={paths.library}>Back to the library</Link>
       </Button>

@@ -6,12 +6,17 @@ import { fileCountQuery } from '@/features/files/api';
 import { useCurrentJob, useStartJob } from '@/features/admin/jobs/api';
 import { useIsAdmin } from '@/features/auth/use-current-user';
 
+// Tall enough that the backdrop reads as a scene rather than a strip.
+const LIBRARY_EMPTY = 'min-h-[60vh]';
+
 export function EmptyLibrary() {
   const isAdmin = useIsAdmin();
 
   if (!isAdmin) {
     return (
       <EmptyState
+        backdrop
+        className={LIBRARY_EMPTY}
         eyebrow="0 frames on the reel"
         title="Nothing here yet"
         description="Ask your admin to scan the library."
@@ -31,6 +36,8 @@ function AdminEmptyLibrary() {
   if (unmatched > 0) {
     return (
       <EmptyState
+        backdrop
+        className={LIBRARY_EMPTY}
         eyebrow={`${unmatched} files waiting`}
         title="Your files need matching"
         description="Movies appear here once their files are matched to TMDB."
@@ -44,6 +51,8 @@ function AdminEmptyLibrary() {
 
   return (
     <EmptyState
+      backdrop
+      className={LIBRARY_EMPTY}
       eyebrow="0 frames on the reel"
       title="Your library is empty"
       description="Scan your media folder to get started."

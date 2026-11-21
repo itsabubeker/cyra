@@ -13,6 +13,7 @@ export function ServerUnreachable({ onRetry, retrying }: ServerUnreachableProps)
   return (
     <EmptyState
       fullScreen
+      backdrop
       indicator={<span className="size-2.5 rounded-full bg-danger shadow-[0_0_14px_var(--danger)]" />}
       title="Can't reach your Cyra server"
       description={<span className="font-mono text-xs tracking-[0.08em] uppercase">At {serverAddress}</span>}
