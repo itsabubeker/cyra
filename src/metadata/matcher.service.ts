@@ -8,6 +8,7 @@ import {
 import { Movie } from '../movies/entities/movie.entity.js';
 import {
   FailedFileDto,
+  MatchCandidateDto,
   UnmatchedFileDto,
 } from './dto/metadata-response.dto.js';
 import { Parsed, pickBest, scoreCandidate } from './title-matcher.js';
@@ -75,7 +76,11 @@ export class MatcherService {
             relativePath: file.relativePath,
             cause,
             candidates: candidates
-              .map((c) => ({ ...c, score: scoreCandidate(parsed, c) }))
+              .map((c) =>
+                Object.assign(new MatchCandidateDto(), c, {
+                  score: scoreCandidate(parsed, c),
+                }),
+              )
               .sort((a, b) => b.score - a.score)
               .slice(0, 3),
           });

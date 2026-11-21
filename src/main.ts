@@ -10,14 +10,13 @@ async function bootstrap() {
 
   const config = new DocumentBuilder()
     .setTitle('Cyra')
-    .setDescription('Crya Api docs')
+    .setDescription('Cyra API docs')
     .setVersion('1.0')
     .addBearerAuth()
     .build();
 
   const documentFactory = () => SwaggerModule.createDocument(app, config);
   SwaggerModule.setup('docs', app, documentFactory);
-  app.enableCors();
   await app.listen(process.env.PORT ?? 3000);
 }
 await bootstrap();

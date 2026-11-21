@@ -118,7 +118,6 @@ the web code with Prettier.
 src/                  NestJS server, one folder per module (auth, movies, files, ...)
 test/                 Server end-to-end tests
 docs/openapi.json     Frozen API contract the web app is built against
-docs/design/          UI design reference
 web/src/
   api/                Fetch client, error type and generated API types
   app/                Providers, query client and the route tree
